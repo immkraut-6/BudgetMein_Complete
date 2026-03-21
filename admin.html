@@ -63,8 +63,12 @@ function renderOrders(orders){
     var items=(o.itemsFull&&o.itemsFull.length)
       ?o.itemsFull.map(function(i){return'• '+(i.e||'🍽️')+' '+i.n+(i.meta?' ('+i.meta+')':'')+' ×'+i.qty+'   ₹'+(i.p*i.qty);}).join('\n')
       :(o.items||'—');
-    var cleanPhone=(o.phone||'').replace(/\D/g,'');
-    if(cleanPhone.length===10) cleanPhone='91'+cleanPhone;
+    // Mask phone — show only last 4 digits
+    var rawPhone=(o.phone||'').replace(/\D/g,'');
+    var maskedPhone=rawPhone.length>=4
+      ? '📱 +91 ••••••' + rawPhone.slice(-4)
+      : '📱 N/A';
+    var cleanPhone=rawPhone.length===10?'91'+rawPhone:rawPhone;
     return'<div class="ocard '+(isDone?'done':'actv')+'" id="oc-'+o._docId+'">'
       +'<div class="ohead">'
         +'<span class="oid">#'+(o.id||'?')+'</span>'
@@ -73,10 +77,10 @@ function renderOrders(orders){
       +'</div>'
       +'<div class="ocust">'
         +'<b>👤 '+(o.name||'Guest')+'</b>'
-        +'<span>📱 '+(o.phone?('<a href="tel:'+o.phone+'" style="color:#FF4500;text-decoration:none">'+o.phone+'</a>'):'N/A')+'</span>'
+        +'<span>'+maskedPhone+' <span style="font-size:.68rem;color:#FF4500;cursor:pointer;text-decoration:underline" onclick="revealPhone(this,\''+rawPhone+'\')">Reveal</span></span>'
         +'<span>📍 '+(o.address||'N/A')+'</span>'
       +'</div>'
-      +(o.specialNote?'<div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px 10px;font-size:.74rem;color:#FFD700;margin-bottom:9px">📝 <b>Customer Note:</b> '+o.specialNote+'</div>':'')
+      +(o.specialNote?'<div style="background:rgba(255,215,0,.1);border:1px solid rgba(255,215,0,.2);border-radius:8px;padding:8px 10px;font-size:.74rem;color:#FFD700;margin-bottom:9px">📝 <b>Note:</b> '+o.specialNote+'</div>':'')
       +'<pre class="oitems">'+items+'</pre>'
       +'<div class="obill">'
         +'<span>Subtotal: ₹'+(o.subtotal||o.total||0)+'</span>'
@@ -88,8 +92,7 @@ function renderOrders(orders){
         +(!isDone
           ?'<button class="btndeliver" onclick="markDone(\''+o._docId+'\',\''+o.id+'\',this)">📦 Mark as Delivered</button>'
           :'<span class="donebadge">✅ Delivered</span>')
-        +(cleanPhone?'<a class="btnwa" href="https://wa.me/'+cleanPhone+'?text=Hi+'+encodeURIComponent(o.name||'Customer')+',+your+order+%23'+(o.id||'')+'+" target="_blank">💬</a>':'')
-        +(cleanPhone?'<a class="btnwa" href="tel:+'+cleanPhone+'" style="font-size:.75rem">📞</a>':'')
+        +(cleanPhone?'<a class="btnwa" href="https://wa.me/'+cleanPhone+'" target="_blank" title="WhatsApp Customer">💬</a>':'')
         +'<button class="btndel" onclick="delOrder(\''+o._docId+'\',\''+o.id+'\')">🗑️</button>'
       +'</div>'
     +'</div>';
@@ -101,7 +104,7 @@ window.markDone=async function(docId,orderId,btn){
   try{
     await updateDoc(doc(db,'orders',docId),{status:'Delivered'});
     var o=window._allOrders.find(function(x){return x._docId===docId;})||{};
-    await tgMsg('✅ <b>ORDER DELIVERED!</b>\n──────────────\n🆔 #'+orderId+'\n👤 '+(o.name||'Guest')+'\n📱 '+(o.phone||'N/A')+'\n📍 '+(o.address||'N/A')+'\n💰 ₹'+(o.total||0)+'\n⏰ '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+    await tgMsg('✅ <b>ORDER DELIVERED!</b>\n──────────────\n🆔 #'+orderId+'\n👤 '+(o.name||'Guest')+'\n📱 '+(o.phone||'N/A')+'\n💰 ₹'+(o.total||0)+'\n⏰ '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
     window.loadOrders();
   }catch(e){alert('Error: '+e.message);if(btn){btn.textContent='📦 Mark as Delivered';btn.disabled=false;}}
 };
@@ -196,9 +199,9 @@ pre.oitems{font-family:'Poppins',sans-serif;font-size:.74rem;color:#777;padding:
 .btndeliver:disabled{background:#2A2A3E;cursor:not-allowed}
 .btndel{padding:10px 14px;border:1.5px solid #C0392B33;border-radius:50px;background:transparent;color:#C0392B;cursor:pointer;transition:all .2s}
 .btndel:hover{background:rgba(192,57,43,.12)}
-.btnwa{padding:8px 12px;border:1.5px solid rgba(37,211,102,.3);border-radius:50px;background:transparent;color:#25D366;cursor:pointer;transition:all .2s;text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:.85rem}
-.btnwa:hover{background:rgba(37,211,102,.12)}
 .donebadge{flex:1;text-align:center;padding:9px;color:#28A745;font-size:.82rem;font-weight:600;background:rgba(40,167,69,.07);border-radius:50px}
+.btnwa{padding:10px 14px;border:1.5px solid rgba(37,211,102,.3);border-radius:50px;background:transparent;color:#25D366;cursor:pointer;transition:all .2s;text-decoration:none;display:flex;align-items:center;justify-content:center;font-size:.9rem}
+.btnwa:hover{background:rgba(37,211,102,.12)}
 #livetime{font-size:.72rem;color:#444}
 @media(max-width:500px){#stats{grid-template-columns:1fr 1fr}.ohead{flex-direction:column;align-items:flex-start}.odt{margin-left:0}}
 </style>
@@ -278,6 +281,12 @@ function exitAdmin(){
   document.getElementById('panel').style.display='none';
   ['p1','p2','p3','p4'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('p1').focus();
+}
+function revealPhone(el,phone){
+  if(!phone){el.parentElement.innerHTML='📱 N/A';return;}
+  var formatted='+91 '+phone.slice(0,5)+' '+phone.slice(5);
+  el.parentElement.innerHTML='📱 '+formatted+
+    ' <a href="tel:+91'+phone+'" style="font-size:.68rem;color:#25D366;text-decoration:none">📞 Call</a>';
 }
 document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&document.getElementById('loginWrap').style.display!=='none')chkPin();
