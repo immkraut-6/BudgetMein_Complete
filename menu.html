@@ -3172,27 +3172,38 @@ function bmAlertConfirm(){
 // Only shows if profile is ACTUALLY incomplete
 function checkAndShowAddressPopup(){
   try{
+    // Never show if already marked as done (form signup or previously completed)
+    if(localStorage.getItem('bm_profile_popup_done')==='1') return;
+
     var u=JSON.parse(localStorage.getItem('bm_user')||'{}');
+    if(!u.email) return; // Not logged in
+
     var phone=(u.phone||'').replace(/\D/g,'');
     var name=(u.name||'').trim();
     var nameLow=name.toLowerCase();
-    // Profile is complete — phone has 10 digits, name is real, not guest
+
+    // Profile is complete — phone has 10 digits, name is real
     var isComplete=(phone.length>=10 && name.length>=2 && nameLow!=='guest user' && nameLow!=='guest');
-    if(isComplete) return; // All good — don't show popup
-    // Show only if logged in (has email) and profile is incomplete
-    if(u.email && !isComplete){
-      var shown=localStorage.getItem('bm_profile_popup_done');
-      if(shown==='1') return; // Already completed once — don't nag
-      setTimeout(function(){
-        // Pre-fill any data we already have
-        try{
-          if(name && nameLow!=='guest user') document.getElementById('acName').value=name;
-          if(u.phone) document.getElementById('acPhone').value=phone.slice(-10);
-        }catch(e2){}
-        document.getElementById('addrCompleteOverlay').style.display='flex';
-        document.body.style.overflow='hidden';
-      },1500);
-    }
+    if(isComplete) return;
+
+    // Also skip if user already has any saved addresses (means they signed up via form)
+    try{
+      var savedAddrs=JSON.parse(localStorage.getItem('bm_addresses')||'[]');
+      if(savedAddrs.length>0){
+        localStorage.setItem('bm_profile_popup_done','1'); // mark done so it never fires again
+        return;
+      }
+    }catch(e2){}
+
+    // Only Google-signup users with no address reach here — show the popup
+    setTimeout(function(){
+      try{
+        if(name && nameLow!=='guest user') document.getElementById('acName').value=name;
+        if(phone) document.getElementById('acPhone').value=phone.slice(-10);
+      }catch(e3){}
+      document.getElementById('addrCompleteOverlay').style.display='flex';
+      document.body.style.overflow='hidden';
+    },1500);
   }catch(e){}
 }
 function getAcGPS(){
@@ -3584,3 +3595,4 @@ checkAndShowAddressPopup();
 
 </body>
 </html>
+
