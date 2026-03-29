@@ -396,40 +396,15 @@ onAuthStateChanged(auth, async function(user){
   var delay = Math.max(0, 1400 - elapsed);
   setTimeout(function(){ if(typeof window._bmHideSplash==='function') window._bmHideSplash(); }, delay);
 });
-// SECURITY: Never ship Telegram bot tokens in frontend code.
-// If you need Telegram notifications, implement a small backend endpoint and call it from here.
-// DEV: use local `telegram-proxy.js` to send messages to Telegram safely.
-// Run the proxy and keep this URL as localhost during development.
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// TELEGRAM DIRECT API — Fill in your bot token & chat IDs
-// Step 1: Message @BotFather on Telegram → /newbot → copy token
-// Step 2: Add bot to your group → message @userinfobot → copy chat ID
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-const TG_BOT_TOKEN = "8601047628:AAFJ0GppVLF8Fdz-cAlY7C3qAZFZVGGJeHw";
-const TG_CHAT_IDS = {
-  order:    "-5158992691",
-  feedback: "-5125185494",
-  customer: "-5136180352"
-};
+// SECURE: Token lives in Vercel Environment Variables (TG_BOT_TOKEN)
+// Calls /api/telegram serverless function — token never exposed to browser
 async function tg(kind, msg){
   try{
-    const token  = TG_BOT_TOKEN;
-    const chatId = TG_CHAT_IDS[kind] || TG_CHAT_IDS.order;
-    if(!token  || token.startsWith("YOUR_"))  return;
-    if(!chatId || chatId.startsWith("YOUR_")) return;
-    const resp = await fetch(
-      "https://api.telegram.org/bot" + token + "/sendMessage",
-      {
-        method:  "POST",
-        headers: {"Content-Type":"application/json"},
-        body:    JSON.stringify({
-          chat_id:                  chatId,
-          text:                     msg,
-          parse_mode:               "HTML",
-          disable_web_page_preview: true
-        })
-      }
-    );
+    const resp = await fetch("/api/telegram", {
+      method:  "POST",
+      headers: {"Content-Type":"application/json"},
+      body:    JSON.stringify({ kind, msg })
+    });
     const data = await resp.json().catch(()=>({}));
     if(!resp.ok || data.ok===false){
       console.warn("TG error:", data.description||JSON.stringify(data));
@@ -1204,9 +1179,13 @@ nav{padding:0 12px;height:56px;gap:8px}
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="gps-btn" id="amGpsBtn" onclick="getAmGPS()">📍 Use My Current Location</button>
           <div class="gps-msg" id="amGpsMsg"></div>
+          <div id="amGpsDisplay" style="display:none;background:#EBF8F2;border:1.5px solid rgba(40,167,69,.3);border-radius:10px;padding:8px 12px;font-size:.74rem;color:#276749;align-items:center;gap:6px">
+            <span>🛰️</span><span id="amGpsCoordsText">GPS not captured</span>
+            <span style="font-size:.65rem;background:rgba(40,167,69,.15);padding:1px 6px;border-radius:8px;margin-left:auto">🔒 Auto-filled</span>
+          </div>
           <div class="addr-divider"><div></div><span>ya type karo</span><div></div></div>
-          <input class="ai" id="amFlat" placeholder="🏠 Ghar / Flat No. *"/>
-          <input class="ai" id="amGali" placeholder="🛣️ Gali No. (e.g. Gali No. 5)"/>
+          <input class="ai" id="amFlat" placeholder="🏠 Ghar / Flat No. *" required/>
+          <input class="ai" id="amGali" placeholder="🛣️ Gali No. (e.g. Gali No. 5) *"/>
           <input class="ai" id="amStreet" placeholder="🏘️ Mohalla / Area"/>
           <input type="hidden" id="amCity" value="Delhi"/>
           <input type="hidden" id="amState" value="Delhi"/>
@@ -1348,6 +1327,11 @@ nav{padding:0 12px;height:56px;gap:8px}
   <p style="font-size:.78rem;color:var(--mu);margin-bottom:16px;text-align:center">
     ⭐ You can give feedback anytime from <b>My Profile → My Orders</b>
   </p>
+  <div style="background:#FFF6F3;border:1.5px solid rgba(255,69,0,.25);border-radius:12px;padding:12px 16px;margin-bottom:16px;font-size:.78rem;color:#CC3700;text-align:center;line-height:1.8">
+    ⚠️ <b>Cancel karna hai?</b> Order accept hone se pehle call karo:<br/>
+    <a href="tel:+919625867683" style="color:#FF4500;font-weight:700;font-size:.85rem">📞 +91 96258 67683</a><br/>
+    <span style="font-size:.7rem;color:#888">Accept ke baad cancel possible nahi hoga.</span>
+  </div>
   <div class="oc-btns">
     <a href="tel:+919625867683" class="oc-btn sec">📞 Call Us</a>
     <a href="tel:+919625867683" class="oc-btn sec" id="dbCallBtn" style="display:none">🛵 Call Delivery Boy</a>
@@ -1399,9 +1383,13 @@ nav{padding:0 12px;height:56px;gap:8px}
         <div style="display:flex;flex-direction:column;gap:8px">
           <button class="gps-btn" id="caGpsBtn" onclick="getGPSLocation()">📍 Use My Current Location</button>
           <div class="gps-msg" id="caGpsMsg"></div>
+          <div id="caGpsDisplay" style="display:none;background:#EBF8F2;border:1.5px solid rgba(40,167,69,.3);border-radius:10px;padding:8px 12px;font-size:.74rem;color:#276749;display:none;align-items:center;gap:6px">
+            <span>🛰️</span><span id="caGpsCoordsText">GPS not captured</span>
+            <span style="font-size:.65rem;background:rgba(40,167,69,.15);padding:1px 6px;border-radius:8px;margin-left:auto">🔒 Auto-filled</span>
+          </div>
           <div class="addr-divider"><div></div><span>ya type karo</span><div></div></div>
-          <input class="ai" id="caFlat" placeholder="🏠 Ghar / Flat No. (e.g. H-42)" autocomplete="off"/>
-          <input class="ai" id="caGali" placeholder="🛣️ Gali No. (e.g. Gali No. 5)" autocomplete="off"/>
+          <input class="ai" id="caFlat" placeholder="🏠 Ghar / Flat No. (e.g. H-42) *" autocomplete="off"/>
+          <input class="ai" id="caGali" placeholder="🛣️ Gali No. (e.g. Gali No. 5) *" autocomplete="off"/>
           <input class="ai" id="caStreet" placeholder="🏘️ Mohalla / Area (e.g. Jahangir Puri)" autocomplete="off"/>
           <input class="ai" id="caPINDisplay" placeholder="📮 PIN Code (e.g. 110033)" maxlength="6" inputmode="numeric" oninput="checkPincode(this.value)" autocomplete="off" style="padding:10px 12px;border:1.5px solid var(--bd);border-radius:10px;font-family:var(--fb);font-size:.85rem;outline:none"/>
           <div id="pincodeMsg" style="display:none;font-size:.72rem;padding:6px 10px;border-radius:8px"></div>
@@ -1870,6 +1858,10 @@ function getGPSLocation(){
     }
     gpsSetMsg('caGpsMsg','ok','✅ Location found! Please check the fields below and enter your Flat/House No.');
     if(btn){btn.classList.add('ok');btn.textContent='✅ Location Captured!';btn.disabled=false;}
+    // Show locked GPS field
+    var caDisp=document.getElementById('caGpsDisplay');
+    var caCoords=document.getElementById('caGpsCoordsText');
+    if(caDisp&&caCoords){caCoords.textContent='Lat: '+lat.toFixed(5)+', Lng: '+lng.toFixed(5);caDisp.style.display='flex';}
   },function(err){
     gpsSetMsg('caGpsMsg','err',err.code===1?'❌ Location access denied. Please allow location or type address below.':'❌ Could not get location. Please type your address below.');
     if(btn){btn.disabled=false;btn.textContent='📍 Use My Current Location';}
@@ -1884,8 +1876,9 @@ function saveCartAddr(){
   var lat=document.getElementById('caGPSLat').value;
   var lng=document.getElementById('caGPSLng').value;
   var hasGPS=lat&&lng;
-  // Validate — need at least house number
+  // Validate — flat + gali both mandatory
   if(!flat){bmAlert('Ghar No. chahiye 🏠','Please enter your House / Flat Number!','warning');return;}
+  if(!gali){bmAlert('Gali No. chahiye 🛣️','Please enter your Gali / Street Number!\n(e.g. Gali No. 5)','warning');return;}
   // PIN validation — only allow 110033
   if(pinInput && pinInput!==ALLOWED_PINCODE){
     bmAlert('Area Not Covered 😔','We currently deliver only to Jahangir Puri (PIN 110033). Please check your PIN code.','info');
@@ -2414,6 +2407,52 @@ async function loadProfileOrders(){
     renderProfileOrders([]);
   }
 }
+// ════════════════════════════════════════════════════════
+// CUSTOMER CANCEL ORDER — only allowed when status=pending
+// ════════════════════════════════════════════════════════
+async function bmCustomerCancelOrder(orderId, docId){
+  var confirmMsg = 'Cancel order #'+orderId+'?\n\nYe sirf tabhi possible hai jab order abhi accept nahi hua.';
+  if(!confirm(confirmMsg)) return;
+  // Double-check status from Firestore before cancelling
+  try{
+    if(typeof window.bmCheckHasOrdered === 'function'){
+      // Use module-level Firestore via window — check live status
+    }
+    // Update Firestore
+    var {doc:_doc, updateDoc:_upd} = await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js');
+    var {getFirestore:_gfs} = await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js');
+    var {getApp:_ga} = await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-app.js');
+    var _db = _gfs(_ga());
+    // Check live status first
+    var {getDoc:_gd} = await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js');
+    var snap = await _gd(_doc(_db,'orders',docId));
+    if(!snap.exists()){
+      bmAlert('Order Not Found','This order could not be found.','error'); return;
+    }
+    var liveStatus = (snap.data().status||'').toLowerCase();
+    if(liveStatus!=='pending'){
+      bmAlert('Cancel Not Possible ❌','Tera order already '+snap.data().status+' ho chuka hai.\nAb cancel nahi ho sakta.\n\nHelp ke liye call karo: +91 96258 67683','warning');
+      loadProfileOrders(); return;
+    }
+    await _upd(_doc(_db,'orders',docId),{
+      status:'Cancelled',
+      cancelReason:'Customer request',
+      cancelledAt:Date.now(),
+      cancelledBy:'customer'
+    });
+    // Update localStorage too
+    try{
+      var ords=JSON.parse(localStorage.getItem('bm_orders')||'[]');
+      ords.forEach(function(o){if((o.id||o.orderId)===orderId){o.status='Cancelled';o.cancelReason='Customer request';}});
+      localStorage.setItem('bm_orders',JSON.stringify(ords));
+    }catch(e2){}
+    bmAlert('Order Cancelled ✅','Tera order #'+orderId+' cancel ho gaya.\nKoi bhi help ke liye call karo: +91 96258 67683','info');
+    loadProfileOrders();
+  }catch(e){
+    bmAlert('Error','Could not cancel: '+e.message+'.\nPlease call +91 96258 67683','error');
+  }
+}
+
 function renderProfileOrders(orders){
   try{
     orders=(orders||[]).filter(Boolean).slice(0,5);
@@ -2435,7 +2474,12 @@ function renderProfileOrders(orders){
       if(typeof o.totalAmount==='undefined') o.totalAmount = o.total || 0;
       if(!o.status) o.status='pending';
       const isDeliveredStatus=(o.status==='Delivered'||o.status==='delivered');
-      const statusEmoji=isDeliveredStatus?'✅':'🔄';
+      const isCancelled=(o.status==='Cancelled'||o.status==='cancelled');
+      const isRejected=(o.status==='Rejected'||o.status==='rejected');
+      const isAccepted=(o.status==='Accepted'||o.status==='accepted');
+      const isPending=(o.status==='pending'||o.status==='Pending');
+      const statusEmoji=isDeliveredStatus?'✅':isCancelled?'🚫':isRejected?'❌':isAccepted?'🍳':isPending?'⏳':'🔄';
+      const statusColor=isDeliveredStatus?'var(--ok)':isCancelled||isRejected?'var(--er)':isAccepted?'#1A73E8':'var(--p)';
       // If older orders don't have itemsFull, build a minimal one from itemsFull-like arrays or string
       if(!o.itemsFull && Array.isArray(o.itemsFull)) o.itemsFull=o.itemsFull;
       var itemsHTML=(o.itemsFull&&o.itemsFull.length)?
@@ -2451,59 +2495,43 @@ function renderProfileOrders(orders){
       if(st && typeof st==='object' && st.seconds) st=st.seconds*1000;
       const elapsed=st?((Date.now()-st)/60000):999;
       const isDelivered=isDeliveredStatus||(elapsed>=42);
-      const trackOrCancelHTML='<div style="margin-top:10px;padding-top:8px;border-top:1px dashed var(--bd)">'+
-        '<div style="font-size:.76rem;font-weight:700;color:var(--n);margin-bottom:8px">📍 Order Status</div>'+
-        TSTEPS.map(function(s,i){
+
+      // ── Estimated time remaining ──
+      var etaHTML='';
+      if(isAccepted&&o.acceptedAt){
+        var accAt=o.acceptedAt;
+        if(typeof accAt==='object'&&accAt&&accAt.seconds)accAt=accAt.seconds*1000;
+        var etaLeft=Math.max(0,30-Math.floor((Date.now()-accAt)/60000));
+        etaHTML='<div style="background:#EBF5FB;border-radius:8px;padding:7px 12px;font-size:.76rem;color:#1A73E8;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">🕐 Estimated delivery in <b>~'+etaLeft+' min</b>'+(etaLeft<=5?' 🛵 Almost there!':'')+'</div>';
+      } else if(isPending){
+        etaHTML='<div style="background:#FFF6F3;border-radius:8px;padding:7px 12px;font-size:.76rem;color:#FF6B35;font-weight:600;margin-bottom:8px">⏳ Waiting for restaurant to accept your order...</div>';
+      }
+      // ── Cancel/Rejected reason ──
+      var reasonHTML='';
+      if((isCancelled||isRejected)&&o.cancelReason){
+        reasonHTML='<div style="background:#FFF3F3;border:1px solid rgba(192,57,43,.2);border-radius:8px;padding:7px 12px;font-size:.74rem;color:var(--er);margin-bottom:8px">📝 Reason: <b>'+o.cancelReason+'</b></div>';
+      }
+      // ── Status tracker ──
+      var trackHTML='';
+      if(!isCancelled&&!isRejected){
+        trackHTML='<div style="margin-bottom:8px">'+TSTEPS.map(function(s,i){
           var done,active;
-          if(isDelivered){
-            done=true; active=false;
-          } else {
-            done=i<TSTEPS.length-1?elapsed>=TSTEPS[i+1].min:false;
-            active=elapsed>=s.min&&!done;
-          }
-          const color=done?'var(--ok)':active?'var(--p)':'var(--bd)';
-          const txtColor=done?'var(--ok)':active?'var(--p)':'var(--mu)';
-          const fw=done||active?'700':'400';
-          return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0">'+
-            '<div style="width:24px;height:24px;border-radius:50%;background:'+color+
-            ';display:flex;align-items:center;justify-content:center;font-size:.65rem;color:#fff;flex-shrink:0">'+
-            (done?'✓':s.emoji)+'</div>'+
-            '<span style="font-size:.78rem;font-weight:'+fw+';color:'+txtColor+'">'+s.name+'</span>'+
-            (active?'<span style="font-size:.65rem;color:var(--p);margin-left:auto">● Live</span>':'')+
-          '</div>';
+          if(isDelivered){done=true;active=false;}
+          else{done=i<TSTEPS.length-1?elapsed>=TSTEPS[i+1].min:false;active=elapsed>=s.min&&!done;}
+          var color=done?'var(--ok)':active?'var(--p)':'var(--bd)';
+          var txtColor=done?'var(--ok)':active?'var(--p)':'var(--mu)';
+          var fw=done||active?'700':'400';
+          return'<div style="display:flex;align-items:center;gap:8px;padding:4px 0"><div style="width:22px;height:22px;border-radius:50%;background:'+color+';display:flex;align-items:center;justify-content:center;font-size:.6rem;color:#fff;flex-shrink:0">'+(done?'✓':s.emoji)+'</div><span style="font-size:.76rem;font-weight:'+fw+';color:'+txtColor+'">'+s.name+'</span>'+(active?'<span style="font-size:.63rem;color:var(--p);margin-left:auto">● Live</span>':'')+'</div>';
         }).join('')+'</div>';
+      }
+      const fbSaved=(function(){try{return JSON.parse(localStorage.getItem('bm_feedbacks')||'[]').some(function(f){return f.orderId===o.id;});}catch(e){return false;}})();
+      const fbBtn=isDelivered?(fbSaved?'<button class="oh-fbtn" disabled style="border-color:var(--ok);color:var(--ok);background:#F0FFF4;cursor:not-allowed;opacity:.9">✅ Feedback Submitted</button>':'<button class="oh-fbtn" onclick="openFeedbackModal(\''+o.id+'\')">⭐ Give Feedback</button>'):'';
+      const cancelBtn=(isPending&&o._docId)?'<button class="oh-fbtn" style="border-color:rgba(192,57,43,.4);color:var(--er)" onclick="bmCustomerCancelOrder(\''+o.id+'\',\''+o._docId+'\')">🚫 Cancel</button>':'';
+      const showDeliveryBoy=!isDelivered&&elapsed>=18&&!isCancelled&&!isRejected;
+      const deliveryBoyBtn=showDeliveryBoy?'<a class="oh-fbtn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="tel:'+DELIVERY_BOY_PHONE+'">🛵 Delivery Boy</a>':'';
+      const actionsHTML='<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><a class="oh-fbtn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="tel:'+SUPPORT_PHONE+'">📞 Support</a>'+deliveryBoyBtn+cancelBtn+'<button class="oh-fbtn" style="border-color:#FFCDD2;color:var(--er)" onclick="deleteOrder(\''+o.id+'\')">🗑️ Delete</button>'+fbBtn+'</div>';
+      return'<div class="oh-item"><div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleOrderDetail(\'od-'+o.id+'\')"><div><div class="oh-id">#'+o.id+'</div><div class="oh-meta">'+o.date+(o.time?' · '+o.time:'')+' · <span style="color:'+statusColor+';font-weight:600">'+statusEmoji+' '+o.status+'</span></div><div class="oh-total">₹'+o.total+' — Tap to see details</div></div><span style="color:var(--p);font-size:1rem;padding:4px">▲</span></div><div id="od-'+o.id+'" style="display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">'+etaHTML+reasonHTML+itemsHTML+trackHTML+actionsHTML+'</div></div>';
 
-      const fbKey = 'fb_' + o.id;
-      const fbSaved = (function(){
-        try{ return JSON.parse(localStorage.getItem('bm_feedbacks')||'[]').some(function(f){return f.orderId===o.id;}); }catch(e){ return false; }
-      })();
-      // Feedback button: always visible, shows "Submitted" after submitting
-      const fbBtn = fbSaved
-        ? '<button class="oh-fbtn" disabled style="border-color:var(--ok);color:var(--ok);background:#F0FFF4;cursor:not-allowed;opacity:.9">✅ Feedback Submitted</button>'
-        : '<button class="oh-fbtn" onclick="openFeedbackModal(\'' + o.id + '\')">⭐ Give Feedback</button>';
-
-      // Delivery Boy button: show ONLY while out for delivery (18-42 min), NOT after delivered
-      const showDeliveryBoy = !isDelivered && elapsed >= 18;
-      const deliveryBoyBtn = showDeliveryBoy
-        ? '<a class="oh-fbtn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="tel:' + DELIVERY_BOY_PHONE + '">🛵 Delivery Boy</a>'
-        : '';
-
-      const actionsHTML =
-        '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
-          '<a class="oh-fbtn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="tel:' + SUPPORT_PHONE + '">📞 Support</a>' +
-          deliveryBoyBtn +
-          '<button class="oh-fbtn" style="border-color:#FFCDD2;color:var(--er)" onclick="deleteOrder(\'' + o.id + '\')">🗑️ Delete</button>' +
-          fbBtn +
-        '</div>';
-
-      return'<div class="oh-item">'+
-        '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleOrderDetail(\'od-'+o.id+'\')">'+
-          '<div><div class="oh-id">#'+o.id+'</div>'+
-          '<div class="oh-meta">'+o.date+(o.time?' · '+o.time:'')+' · <span style="color:'+(isDeliveredStatus?'var(--ok)':'var(--p)')+'">'+statusEmoji+' '+o.status+'</span></div>'+
-          '<div class="oh-total">₹'+o.total+' — Tap to hide/show details</div></div>'+
-          '<span style="color:var(--p);font-size:1rem;padding:4px">▲</span></div>'+
-        '<div id="od-'+o.id+'" style="display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">'+
-          itemsHTML+trackOrCancelHTML+actionsHTML+'</div></div>';
     }).join('');
     // AUTO-EXPAND so users can actually see the orders without extra clicks
     document.getElementById('ordBody').classList.add('open');
@@ -2824,6 +2852,10 @@ function getAmGPS(){
     }
     gpsSetMsg('amGpsMsg','ok','✅ Location found! Please enter your Flat/House No.');
     if(btn){btn.classList.add('ok');btn.textContent='✅ Location Captured!';btn.disabled=false;}
+    // Show locked GPS field
+    var amDisp=document.getElementById('amGpsDisplay');
+    var amCoords=document.getElementById('amGpsCoordsText');
+    if(amDisp&&amCoords){amCoords.textContent='Lat: '+lat.toFixed(5)+', Lng: '+lng.toFixed(5);amDisp.style.display='flex';}
   },function(err){
     gpsSetMsg('amGpsMsg','err',err.code===1?'❌ Location denied. Please type address.':'❌ Could not get location.');
     if(btn){btn.disabled=false;btn.textContent='📍 Use My Current Location';}
@@ -2838,8 +2870,8 @@ function saveAddressFromModal(){
     var street=(document.getElementById('amStreet').value||'').trim();
     var lat=(document.getElementById('amGPSLat')&&document.getElementById('amGPSLat').value||'');
     var lng=(document.getElementById('amGPSLng')&&document.getElementById('amGPSLng').value||'');
-    var hasAddr=flat||(lat&&lng);
-    if(!hasAddr){bmAlert('Missing Info 🏠','Please enter your Flat/House No. or use GPS!','warning');return;}
+    if(!flat){bmAlert('Ghar No. chahiye 🏠','Please enter your House / Flat Number!','warning');return;}
+    if(!gali){bmAlert('Gali No. chahiye 🛣️','Please enter your Gali / Street Number!\n(e.g. Gali No. 5)','warning');return;}
     var parts=[flat||''];
     if(gali)parts.push(gali);
     if(street)parts.push(street);
@@ -3451,6 +3483,10 @@ function getAcGPS(){
     }
     gpsSetMsg('acGpsMsg','ok','✅ Location found! Please enter your Flat/House No.');
     if(btn){btn.classList.add('ok');btn.textContent='✅ Location Captured!';btn.disabled=false;}
+    // Show locked GPS field
+    var acDisp=document.getElementById('acGpsDisplay');
+    var acCoords=document.getElementById('acGpsCoordsText');
+    if(acDisp&&acCoords){acCoords.textContent='Lat: '+lat.toFixed(5)+', Lng: '+lng.toFixed(5);acDisp.style.display='flex';}
   },function(err){
     gpsSetMsg('acGpsMsg','err',err.code===1?'❌ Location denied. Please type address.':'❌ Could not get location.');
     if(btn){btn.disabled=false;btn.textContent='📍 Use My Current Location';}
@@ -3468,7 +3504,8 @@ async function saveAddressComplete(){
   err.style.display='none';
   if(!name||name.length<2){err.style.display='block';err.textContent='Please enter your full name!';return;}
   if(!phone||phone.length!==10||!/^\d{10}$/.test(phone)){err.style.display='block';err.textContent='Please enter a valid 10-digit phone number!';return;}
-  if(!flat&&!(lat&&lng)){err.style.display='block';err.textContent='Please enter your House No. or use GPS location!';return;}
+  if(!flat){err.style.display='block';err.textContent='🏠 Please enter your House / Flat Number!';return;}
+  if(!gali){err.style.display='block';err.textContent='🛣️ Please enter your Gali / Street Number! (e.g. Gali No. 5)';return;}
   try{
     await window.bmClaimCustomerPhone(phone,{
       email:(JSON.parse(localStorage.getItem('bm_user')||'{}').email)||'',
@@ -3641,9 +3678,13 @@ initTodaySpecial();
       <input class="ai" id="acPhone" type="tel" placeholder="📱 Phone Number (10 digits) *" maxlength="10" inputmode="numeric"/>
       <button class="gps-btn" id="acGpsBtn" onclick="getAcGPS()">📍 Use My Current Location</button>
       <div class="gps-msg" id="acGpsMsg"></div>
+      <div id="acGpsDisplay" style="display:none;background:#EBF8F2;border:1.5px solid rgba(40,167,69,.3);border-radius:10px;padding:8px 12px;font-size:.74rem;color:#276749;align-items:center;gap:6px">
+        <span>🛰️</span><span id="acGpsCoordsText">GPS not captured</span>
+        <span style="font-size:.65rem;background:rgba(40,167,69,.15);padding:1px 6px;border-radius:8px;margin-left:auto">🔒 Auto-filled</span>
+      </div>
       <div class="addr-divider"><div></div><span>ya type karo</span><div></div></div>
-      <input class="ai" id="acFlat" type="text" placeholder="🏠 Ghar / Flat No. (e.g. H-42) *"/>
-      <input class="ai" id="acGali" type="text" placeholder="🛣️ Gali No. (e.g. Gali No. 5)"/>
+      <input class="ai" id="acFlat" type="text" placeholder="🏠 Ghar / Flat No. (e.g. H-42) *" required/>
+      <input class="ai" id="acGali" type="text" placeholder="🛣️ Gali No. (e.g. Gali No. 5) *"/>
       <input class="ai" id="acStreet" type="text" placeholder="🏘️ Mohalla / Area (e.g. Bhalswa Dairy)"/>
       <input type="hidden" id="acPIN" value="110033"/>
       <input type="hidden" id="acGPSLat" value=""/>
@@ -3915,4 +3956,3 @@ initTodaySpecial();
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then(function(choice){
       if(choice.outcome === 'accepted'){
- 
