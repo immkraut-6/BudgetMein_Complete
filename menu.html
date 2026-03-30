@@ -2194,6 +2194,7 @@ async function placeOrder(){
     time:orderObj.time,
     startTime:nowMs
   };
+  if(typeof window.bmSaveOrder==='function') window.bmSaveOrder(fbData);
   if(typeof window.bmOrderTG==='function') window.bmOrderTG({id:orderId,platformFee:platFee},items,sub,del,platFee);
 }
 function backToMenu(){
