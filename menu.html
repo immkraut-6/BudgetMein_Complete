@@ -2194,17 +2194,6 @@ async function placeOrder(){
     time:orderObj.time,
     startTime:nowMs
   };
-  if(typeof window.bmSaveOrder==='function'){
-    window.bmSaveOrder(fbData).catch(function(e){ console.warn('[BudgetMein] bmSaveOrder err',e); });
-  }
-  if(typeof window.bmAddOrderDoc === 'function'){
-    window.bmAddOrderDoc({
-      userId:    currentUser.uid,
-      items:     fbData.itemsFull || [],
-      totalPrice: totalFinal,
-      createdAt: new Date()
-    }).catch(function(e){ console.warn('[BudgetMein] bmAddOrderDoc err',e); });
-  }
   if(typeof window.bmOrderTG==='function') window.bmOrderTG({id:orderId,platformFee:platFee},items,sub,del,platFee);
 }
 function backToMenu(){
