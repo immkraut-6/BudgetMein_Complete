@@ -614,7 +614,16 @@ window.loadOrdersFromFirebase=async function(){
     var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
     var snap=await getDocs(q);
     var orders=[];
-    snap.forEach(function(d){orders.push({_docId:d.id,...d.data()});});
+    snap.forEach(function(d){
+      var data=d.data();
+      // Normalize: Firestore stores orderId, UI expects id
+      var oid=data.orderId||data.id||'';
+      // Convert Firestore Timestamp to plain ms number so JSON.stringify works
+      var st=data.startTime;
+      if(st && typeof st==='object' && st.seconds) st=st.seconds*1000;
+      else if(st && typeof st==='object' && st.toMillis) st=st.toMillis();
+      orders.push({_docId:d.id, id:oid, ...data, startTime:st});
+    });
     if(orders.length){
       localStorage.setItem("bm_orders",JSON.stringify(orders));
       return orders;
@@ -3191,74 +3200,160 @@ function toggleOrderDetail(id){
 // CANCEL ORDER SYSTEM — 100% Firestore, no localStorage
 // Rules: pending only, within 3 min, max 2/day
 // ═════════════════════════════════════════════
-const CANCEL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+const CANCEL_WINDOW_MS = 3 * 60 * 1000;
 const MAX_CANCELS_PER_DAY = 2;
 window._currentCancelOrderId = null;
 var _ocCancelTimerIv = null;
 
-// Fetch a single order directly from Firestore by orderId
+// Convert any startTime value (Firestore Timestamp or ms number) to ms
+function toMs(st){
+  if(!st) return null;
+  if(typeof st === 'number') return st;
+  if(typeof st === 'object' && st.seconds) return st.seconds * 1000;
+  if(typeof st === 'object' && st.toMillis) return st.toMillis();
+  return null;
+}
+
+// Fetch order from Firestore by orderId (field saved as "orderId" not "id")
 async function getOrderFromFirestore(orderId){
   try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid||!orderId) return null;
-    var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
-    var snap=await getDocs(q);
-    var found=null;
+    var uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
+    if(!uid || !orderId) return null;
+    var q = query(collection(db,'orders'), where('userId','==',uid), orderBy('startTime','desc'), limit(30));
+    var snap = await getDocs(q);
+    var found = null;
     snap.forEach(function(d){
-      var data=d.data();
-      // Firestore stores field as "orderId", normalize to "id" for consistency
-      var oid=data.orderId||data.id||'';
-      if(oid===orderId){
-        found={_docId:d.id, id:oid, ...data};
+      var data = d.data();
+      var oid  = data.orderId || data.id || '';
+      if(oid === orderId){
+        found = { _docId: d.id, id: oid, ...data };
       }
     });
     return found;
-  }catch(e){ console.warn('getOrderFromFirestore err',e); return null; }
+  }catch(e){ console.warn('getOrderFromFirestore err', e); return null; }
 }
 
-// Read cancel count from Firestore users/{uid}.cancelLog
+// Read today's cancel count from Firestore users/{uid}.cancelLog
 async function getCancelCount(){
   try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
+    var uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
     if(!uid) return 0;
-    var snap=await getDoc(doc(db,'users',uid));
+    var snap = await getDoc(doc(db,'users',uid));
     if(!snap.exists()) return 0;
-    var data=snap.data().cancelLog||{};
-    var today=new Date().toDateString();
-    if(data.date!==today) return 0;
-    return data.count||0;
+    var data = snap.data().cancelLog || {};
+    var today = new Date().toDateString();
+    if(data.date !== today) return 0;
+    return data.count || 0;
   }catch(e){ return 0; }
 }
 
-// Write cancel count to Firestore users/{uid}.cancelLog
+// Write today's cancel count to Firestore users/{uid}.cancelLog
 async function incrementCancelCount(){
   try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
+    var uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
     if(!uid) return;
-    var today=new Date().toDateString();
-    var current=await getCancelCount();
-    await updateDoc(doc(db,'users',uid),{
-      cancelLog:{date:today, count:current+1},
-      updatedAt:serverTimestamp()
+    var today   = new Date().toDateString();
+    var current = await getCancelCount();
+    await updateDoc(doc(db,'users',uid), {
+      cancelLog: { date: today, count: current + 1 },
+      updatedAt: serverTimestamp()
     });
-  }catch(e){ console.warn('incrementCancelCount err',e); }
+  }catch(e){ console.warn('incrementCancelCount err', e); }
 }
 
-// All checks against live Firestore order data
+// All checks run against live Firestore data
 async function canCancelOrder(order){
-  if(!order) return {ok:false,reason:'Order not found'};
-  var status=(order.status||'pending').toLowerCase();
-  if(status==='cancelled') return {ok:false,reason:'Already cancelled'};
-  if(status==='delivered') return {ok:false,reason:'Already delivered'};
-  if(status==='accepted')  return {ok:false,reason:'Order already accepted by delivery boy'};
-  var st=order.startTime;
-  if(st && typeof st==='object' && st.seconds) st=st.seconds*1000;
-  if(!st) return {ok:false,reason:'Order time unknown'};
-  if(Date.now()-st > CANCEL_WINDOW_MS) return {ok:false,reason:'Cancel window expired (3 min)'};
-  var count=await getCancelCount();
-  if(count>=MAX_CANCELS_PER_DAY) return {ok:false,reason:'Max 2 cancels per day reached'};
-  return {ok:true};
+  if(!order) return { ok:false, reason:'Order not found' };
+  var status = (order.status || 'pending').toLowerCase();
+  if(status === 'cancelled') return { ok:false, reason:'Already cancelled' };
+  if(status === 'delivered') return { ok:false, reason:'Already delivered' };
+  if(status === 'accepted')  return { ok:false, reason:'Order already accepted by delivery boy' };
+  var st = toMs(order.startTime);
+  if(!st) return { ok:false, reason:'Order time unknown' };
+  if(Date.now() - st > CANCEL_WINDOW_MS) return { ok:false, reason:'Cancel window expired (3 min)' };
+  var count = await getCancelCount();
+  if(count >= MAX_CANCELS_PER_DAY) return { ok:false, reason:'Max 2 cancels per day reached' };
+  return { ok:true };
 }
+
+// ── openCancelModal ──
+// IMPORTANT: async functions cannot be called directly from HTML onclick and
+// properly await. So we use a sync wrapper that calls the async version.
+async function _openCancelModalAsync(orderId){
+  if(!orderId) return;
+  try{
+    var order = await getOrderFromFirestore(orderId);
+    var check = await canCancelOrder(order);
+    if(!check.ok){
+      bmAlert('Cannot Cancel', check.reason + '\n\nPlease call us: +91 96258 67683', 'warning');
+      return;
+    }
+    window._currentCancelOrderId = orderId;
+    document.querySelectorAll('input[name="cancelReason"]').forEach(function(r){ r.checked = false; });
+    document.querySelectorAll('#cancelReasons label').forEach(function(l){
+      l.style.borderColor = 'var(--bd)'; l.style.background = '';
+    });
+    document.getElementById('cancelReasonErr').style.display = 'none';
+    document.getElementById('cancelModalOrderId').textContent = 'Order #' + orderId;
+    document.getElementById('cancelModal').classList.add('on');
+    document.body.style.overflow = 'hidden';
+  }catch(e){
+    console.error('openCancelModal err', e);
+    bmAlert('Error','Could not load order. Please try again.','error');
+  }
+}
+function openCancelModal(orderId){ _openCancelModalAsync(orderId); }
+
+// ── confirmCancelOrder ──
+async function _confirmCancelOrderAsync(){
+  var reason = document.querySelector('input[name="cancelReason"]:checked');
+  if(!reason){
+    document.getElementById('cancelReasonErr').style.display = 'block';
+    return;
+  }
+  var orderId    = window._currentCancelOrderId;
+  var reasonText = reason.value;
+  if(!orderId) return;
+
+  var btn = document.querySelector('#cancelModal button:last-child');
+  if(btn){ btn.disabled = true; btn.textContent = 'Cancelling...'; }
+
+  try{
+    // 1. Cancel in Firestore
+    await window.cancelOrderInFirebase(orderId, reasonText);
+
+    // 2. Increment daily cancel count in Firestore
+    await incrementCancelCount();
+
+    // 3. Update localStorage cache so UI reflects immediately
+    try{
+      var orders = JSON.parse(localStorage.getItem('bm_orders') || '[]');
+      orders = orders.map(function(o){
+        var oid = o.orderId || o.id || '';
+        if(oid === orderId){ o.status = 'Cancelled'; o.cancelReason = reasonText; o.cancelledAt = Date.now(); }
+        return o;
+      });
+      localStorage.setItem('bm_orders', JSON.stringify(orders));
+    }catch(e){}
+
+    // 4. Telegram notification
+    var user = JSON.parse(localStorage.getItem('bm_user') || '{}');
+    tg('order', '\uD83D\uDEAB <b>ORDER CANCELLED</b>\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\uD83C\uDD94 #'+orderId+'\n\uD83D\uDC64 '+(user.name||'Customer')+'\n\uD83D\uDCF1 '+(user.phone||'N/A')+'\n\u2753 <b>Reason:</b> '+reasonText+'\n\u23F0 '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+
+    closeCancelModal();
+    updateOcCancelBtn(orderId, true);
+    if(typeof showOrderHistory === 'function') showOrderHistory();
+    else if(typeof renderProfileOrders === 'function') renderProfileOrders();
+
+    bmAlert('Order Cancelled', 'Your order #'+orderId+' has been cancelled.\nReason: '+reasonText, 'info');
+
+  }catch(e){
+    console.error('confirmCancelOrder err', e);
+    if(btn){ btn.disabled = false; btn.textContent = 'Cancel Order'; }
+    bmAlert('Error','Could not cancel order. Please call us: +91 96258 67683','warning');
+  }
+}
+function confirmCancelOrder(){ _confirmCancelOrderAsync(); }
 
 function selectCancelReason(label){
   document.querySelectorAll('#cancelReasons label').forEach(function(l){
