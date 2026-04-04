@@ -614,24 +614,30 @@ window.markOrderDelivered=async function(orderId){
   }catch(e){console.warn("markDelivered err",e);return false;}
 };
 window.cancelOrderInFirebase=async function(orderId, reason){
-  try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
-    var snap=await getDocs(q);
-    var promises=[];
-    snap.forEach(function(d){
-      var oid=d.data().orderId||d.data().id||'';
-      if(oid===orderId){
-        promises.push(updateDoc(doc(db,"orders",d.id),{
-          status:"Cancelled",
-          cancelReason:reason||"",
-          cancelledAt:Date.now()
-        }));
-      }
-    });
-    await Promise.all(promises);
-    return promises.length>0;
-  }catch(e){console.warn("cancelOrder err",e);return false;}
+  // Fast path: use the doc ID saved when order was placed
+  var directDocId = window._activeOrderDocId || "";
+  if(directDocId){
+    try{
+      await updateDoc(doc(db,"orders",directDocId),{status:"Cancelled",cancelReason:reason||"",cancelledAt:Date.now()});
+      console.log("[BM] cancelOrder direct OK | docId="+directDocId);
+      return true;
+    }catch(e2){ console.warn("[BM] direct cancel failed, trying query",e2); }
+  }
+  // Fallback: query by userId + orderId
+  var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||"";
+  if(!uid) throw new Error("Not logged in");
+  var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
+  var snap=await getDocs(q);
+  var promises=[];
+  snap.forEach(function(d){
+    var oid=d.data().orderId||d.data().id||"";
+    if(oid===orderId){
+      promises.push(updateDoc(doc(db,"orders",d.id),{status:"Cancelled",cancelReason:reason||"",cancelledAt:Date.now()}));
+    }
+  });
+  if(promises.length===0) throw new Error("Order not found in Firestore");
+  await Promise.all(promises);
+  return true;
 };
 
 window.deleteOrderFromFirebase=async function(orderId){
@@ -3414,8 +3420,9 @@ async function _confirmCancelOrderAsync(){
   var btn=document.querySelector('#cancelModal button:last-child');
   if(btn){btn.disabled=true;btn.textContent='Cancelling...';}
   try{
+    // Cancel in Firestore - throws if order not found
     await window.cancelOrderInFirebase(orderId,reasonText);
-    await incrementCancelCount();
+    // Update localStorage
     try{
       var orders=JSON.parse(localStorage.getItem('bm_orders')||'[]');
       orders=orders.map(function(o){
@@ -3424,33 +3431,30 @@ async function _confirmCancelOrderAsync(){
         return o;
       });
       localStorage.setItem('bm_orders',JSON.stringify(orders));
-    }catch(e){}
-    var user=JSON.parse(localStorage.getItem('bm_user')||'{}')
-    tg('order','\uD83D\uDEAB <b>ORDER CANCELLED</b>\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\uD83C\uDD94 #'+orderId+'\n\uD83D\uDC64 '+(user.name||'Customer')+'\n\uD83D\uDCF1 '+(user.phone||'N/A')+'\n\u2753 <b>Reason:</b> '+reasonText+'\n\u23F0 '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+    }catch(le){}
+    // Increment cancel counter
+    await incrementCancelCount();
+    // Telegram notification (non-blocking)
+    var user=JSON.parse(localStorage.getItem('bm_user')||'{}')||{};
+    tg('order','\u{1F6AB} ORDER CANCELLED | #'+orderId+' | '+(user.name||'Customer')+' | '+(user.phone||'N/A')+' | Reason: '+reasonText);
+    // Close the cancel modal
     closeCancelModal();
+    // Update cancel button on order confirm screen
     updateOcCancelBtn(orderId,true);
-    if(typeof showOrderHistory==='function') showOrderHistory();
-    else if(typeof renderProfileOrders==='function') renderProfileOrders();
-    bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\nReason: '+reasonText,'info',function(){
-      // Hide the cancel button for this order in the profile list
+    // Show success popup - when user taps OK, refresh order list
+    bmAlert('Order Cancelled!','Your order #'+orderId+' has been cancelled.\n\nReason: '+reasonText,'info',function(){
       try{
-        var cancelBtns=document.querySelectorAll('[onclick*="openCancelModal(\''+orderId+'\')"]');
+        var cancelBtns=document.querySelectorAll('[onclick*="openCancelModal(\'"+orderId+"\')"]');
         cancelBtns.forEach(function(b){b.style.display='none';});
-        // Also mark the order status text as Cancelled in the UI
-        var ohItem=document.getElementById('od-'+orderId);
-        if(ohItem){
-          var statusSpan=ohItem.previousElementSibling&&ohItem.previousElementSibling.querySelector('.oh-meta span');
-          if(statusSpan){statusSpan.style.color='var(--er)';statusSpan.textContent='🚫 Cancelled';}
-        }
-        // Refresh the full order list from localStorage
         var fo=JSON.parse(localStorage.getItem('bm_orders')||'[]');
         if(typeof renderProfileOrders==='function') renderProfileOrders(fo);
+        else if(typeof showOrderHistory==='function') showOrderHistory();
       }catch(re){console.warn('[BM] post-cancel UI err',re);}
     });
   }catch(e){
     console.error('confirmCancelOrder err',e);
     if(btn){btn.disabled=false;btn.textContent='Cancel Order';}
-    bmAlert('Error','Could not cancel order. Please call us: +91 96258 67683','warning');
+    bmAlert('Error','Could not cancel order. Please try again or call: +91 96258 67683','warning');
   }
 }
 function confirmCancelOrder(){_confirmCancelOrderAsync();}
