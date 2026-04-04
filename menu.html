@@ -416,12 +416,16 @@ async function tg(kind, msg){
 window.bmSaveOrder=async function(orderData){
   try{
     var nowMs=Date.now();
+    // ✅ FIX: Always use auth.currentUser.uid from inside the module scope.
+    // window._bmUserId can be empty if onAuthStateChanged hasn't fired yet,
+    // causing Firestore read/update rules (which check userId == auth.uid) to always fail.
+    var resolvedUid = (auth.currentUser && auth.currentUser.uid) || orderData.userId || window._bmUserId || '';
     var cleanItems=(orderData.itemsFull||[]).map(function(i){
       return{name:i.n||i.name||'',quantity:i.qty||i.quantity||1,price:i.p||i.price||0};
     });
     var firestoreData={
       orderId:       orderData.id,
-      userId:        orderData.userId||window._bmUserId||'',
+      userId:        resolvedUid,
       customerName:  orderData.name||'Guest',
       phone:         orderData.phone||'',
       address:       orderData.address||'',
@@ -2125,7 +2129,8 @@ async function placeOrder(){
   const sub=keys.reduce(function(s,k){return s+(cart[k].p*cart[k].qty);},0);
   const platFee=(typeof PLATFORM_FEE!=='undefined')?PLATFORM_FEE:5;
   // Secure first-order free delivery — check Firestore, not localStorage
-  var _uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
+  // ✅ FIX: Use currentUser.uid (from Firebase module) — more reliable than window._bmUserId
+  var _uid = currentUser.uid || window._bmUserId || '';
   var _hasOrdered = _uid ? await bmCheckHasOrdered(_uid) : true;
   var del = _hasOrdered ? 25 : 0;  // Free delivery only for genuine first order
   var isFirstOrder = !_hasOrdered;
@@ -2165,7 +2170,8 @@ async function placeOrder(){
     email:user.email||'',
     status:'pending',
     deliveryBoyId:null,
-    userId:window._bmUserId||'',
+    // ✅ FIX: Use currentUser.uid directly — window._bmUserId can be '' if auth hasn't resolved yet
+    userId:currentUser.uid||window._bmUserId||'',
     startTime:nowMs
   };
   orders.unshift(orderObj);
@@ -2240,7 +2246,8 @@ async function placeOrder(){
     mapsQuery:orderObj.mapsQuery||deliveryAddress,
     status:'pending',
     deliveryBoyId:null,
-    userId:window._bmUserId||'',
+    // ✅ FIX: Use currentUser.uid directly — window._bmUserId can be '' if auth hasn't resolved yet
+    userId:currentUser.uid||window._bmUserId||'',
     date:orderObj.date,
     time:orderObj.time,
     startTime:nowMs
