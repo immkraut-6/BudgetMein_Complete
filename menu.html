@@ -559,6 +559,25 @@ window.markOrderDelivered=async function(orderId){
     return true;
   }catch(e){console.warn("markDelivered err",e);return false;}
 };
+window.cancelOrderInFirebase=async function(orderId, reason){
+  try{
+    var q=query(collection(db,"orders"),orderBy("timestamp","desc"),limit(30));
+    var snap=await getDocs(q);
+    var promises=[];
+    snap.forEach(function(d){
+      if(d.data().id===orderId){
+        promises.push(updateDoc(doc(db,"orders",d.id),{
+          status:"Cancelled",
+          cancelReason:reason||"",
+          cancelledAt:Date.now()
+        }));
+      }
+    });
+    await Promise.all(promises);
+    return true;
+  }catch(e){console.warn("cancelOrder err",e);return false;}
+};
+
 window.deleteOrderFromFirebase=async function(orderId){
   try{
     // Find all docs with this orderId and delete them
@@ -1310,8 +1329,44 @@ nav{padding:0 12px;height:56px;gap:8px}
     <a href="tel:+919625867683" class="oc-btn sec">📞 Call Us</a>
     <a href="tel:+919625867683" class="oc-btn sec" id="dbCallBtn" style="display:none">🛵 Call Delivery Boy</a>
     <button class="oc-btn prim" onclick="backToMenu()">🏠 Back to Menu</button>
+    <button class="oc-btn" id="ocCancelBtn" onclick="openCancelModal(window._currentCancelOrderId)" style="background:#FFF0F0;color:var(--er);border:1.5px solid #FFCDD2;display:none;margin-top:6px;width:100%">🚫 Cancel Order</button>
+  </div>
+  <div id="ocCancelTimer" style="display:none;font-size:.72rem;color:var(--er);text-align:center;margin-top:6px;font-weight:600"></div>
+</div>
+<!-- CANCEL ORDER MODAL -->
+<div class="bm-modal-overlay" id="cancelModal" onclick="if(event.target===this)closeCancelModal()">
+  <div class="bm-modal-box">
+    <div class="bm-modal-icon">🚫</div>
+    <div class="bm-modal-title">Cancel Order?</div>
+    <div style="padding:0 24px 12px;font-size:.82rem;color:var(--mu);text-align:center" id="cancelModalOrderId"></div>
+    <div style="padding:0 20px 8px">
+      <div style="font-size:.78rem;font-weight:700;color:var(--n);margin-bottom:10px">Please select a reason:</div>
+      <div id="cancelReasons" style="display:flex;flex-direction:column;gap:6px">
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:.8rem;transition:border-color .2s" onclick="selectCancelReason(this)">
+          <input type="radio" name="cancelReason" value="Wrong item ordered" style="accent-color:var(--p);flex-shrink:0"/> Wrong item ordered
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:.8rem;transition:border-color .2s" onclick="selectCancelReason(this)">
+          <input type="radio" name="cancelReason" value="Changed my mind" style="accent-color:var(--p);flex-shrink:0"/> Changed my mind
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:.8rem;transition:border-color .2s" onclick="selectCancelReason(this)">
+          <input type="radio" name="cancelReason" value="Order by mistake" style="accent-color:var(--p);flex-shrink:0"/> Order by mistake
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:.8rem;transition:border-color .2s" onclick="selectCancelReason(this)">
+          <input type="radio" name="cancelReason" value="Delivery time too long" style="accent-color:var(--p);flex-shrink:0"/> Delivery time too long
+        </label>
+        <label style="display:flex;align-items:center;gap:10px;padding:9px 12px;border:1.5px solid var(--bd);border-radius:10px;cursor:pointer;font-size:.8rem;transition:border-color .2s" onclick="selectCancelReason(this)">
+          <input type="radio" name="cancelReason" value="Other" style="accent-color:var(--p);flex-shrink:0"/> Other
+        </label>
+      </div>
+      <div style="font-size:.72rem;color:var(--er);margin-top:6px;display:none" id="cancelReasonErr">⚠️ Please select a reason</div>
+    </div>
+    <div style="display:flex;gap:10px;padding:12px 20px 20px">
+      <button onclick="closeCancelModal()" style="flex:1;padding:11px;border:1.5px solid var(--bd);border-radius:12px;background:var(--w);color:var(--mu);font-family:var(--fb);font-size:.85rem;font-weight:600;cursor:pointer">Keep Order</button>
+      <button onclick="confirmCancelOrder()" style="flex:1;padding:11px;border:none;border-radius:12px;background:var(--er);color:#fff;font-family:var(--fb);font-size:.85rem;font-weight:600;cursor:pointer">Cancel Order</button>
+    </div>
   </div>
 </div>
+
 <button class="fcart" onclick="openCart()">🛒<span class="fbadge" id="fbadge">0</span></button>
 <div class="overlay" id="cOverlay" onclick="closeCart()"></div>
 <aside class="sidebar" id="cSidebar" aria-label="Cart">
@@ -2150,6 +2205,9 @@ async function placeOrder(){
   document.body.style.overflow='hidden';
   startOrderTimer(orderId);
   initTracker();
+  // Show cancel button with countdown on order confirm screen
+  window._currentCancelOrderId=orderId;
+  updateOcCancelBtn(orderId, false);
 
   // ================================================================
   // ✅ STEP 2 — Save order to Firestore + send Telegram (fire-and-forget)
@@ -2382,8 +2440,10 @@ function renderProfileOrders(orders){
       if(typeof o.total==='undefined' && (o.subtotal||o.delivery)) o.total=(o.subtotal||0)+(o.delivery||0)+(o.platformFee||0);
       if(typeof o.totalAmount==='undefined') o.totalAmount = o.total || 0;
       if(!o.status) o.status='pending';
+      const isCancelledStatus=(o.status==='Cancelled'||o.status==='cancelled');
       const isDeliveredStatus=(o.status==='Delivered'||o.status==='delivered');
-      const statusEmoji=isDeliveredStatus?'✅':'🔄';
+      const statusEmoji=isDeliveredStatus?'✅':isCancelledStatus?'🚫':'🔄';
+      const statusColor=isDeliveredStatus?'var(--ok)':isCancelledStatus?'var(--er)':'var(--p)';
       // If older orders don't have itemsFull, build a minimal one from itemsFull-like arrays or string
       if(!o.itemsFull && Array.isArray(o.itemsFull)) o.itemsFull=o.itemsFull;
       var itemsHTML=(o.itemsFull&&o.itemsFull.length)?
@@ -2436,18 +2496,34 @@ function renderProfileOrders(orders){
         ? '<a class="oh-fbtn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="tel:' + DELIVERY_BOY_PHONE + '">🛵 Delivery Boy</a>'
         : '';
 
+      const isCancelled = o.status==='Cancelled' || o.status==='cancelled';
+      const cancelWindowMs = 3 * 60 * 1000;
+      var st2=o.startTime;
+      if(st2 && typeof st2==='object' && st2.seconds) st2=st2.seconds*1000;
+      const withinWindow = st2 ? (Date.now()-st2) < cancelWindowMs : false;
+      const canCancel = !isCancelled && !isDelivered && o.status!=='Accepted' && withinWindow;
+
+      const cancelBtn = isCancelled
+        ? '<div style="font-size:.72rem;color:var(--er);font-weight:600;padding:4px 0">🚫 Cancelled' + (o.cancelReason ? ' — ' + o.cancelReason : '') + '</div>'
+        : canCancel
+          ? '<button class="oh-fbtn" style="border-color:#FFCDD2;color:var(--er);background:#FFF0F0" onclick="openCancelModal(\''+o.id+'\')">🚫 Cancel</button>'
+          : (!isDelivered && !isCancelled && o.status!=='Accepted'
+            ? '<button class="oh-fbtn" disabled style="border-color:var(--bd);color:var(--mu);opacity:.5;cursor:not-allowed" title="Cancel window expired">🚫 Cancel</button>'
+            : '');
+
       const actionsHTML =
         '<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px">' +
           '<a class="oh-fbtn" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px" href="tel:' + SUPPORT_PHONE + '">📞 Support</a>' +
           deliveryBoyBtn +
-          '<button class="oh-fbtn" style="border-color:#FFCDD2;color:var(--er)" onclick="deleteOrder(\'' + o.id + '\')">🗑️ Delete</button>' +
-          fbBtn +
+          cancelBtn +
+          (isCancelled ? '' : '<button class="oh-fbtn" style="border-color:#FFCDD2;color:var(--er)" onclick="deleteOrder(\'' + o.id + '\')">🗑️ Delete</button>') +
+          (isCancelled ? '' : fbBtn) +
         '</div>';
 
       return'<div class="oh-item">'+
         '<div style="display:flex;justify-content:space-between;align-items:center;cursor:pointer" onclick="toggleOrderDetail(\'od-'+o.id+'\')">'+
           '<div><div class="oh-id">#'+o.id+'</div>'+
-          '<div class="oh-meta">'+o.date+(o.time?' · '+o.time:'')+' · <span style="color:'+(isDeliveredStatus?'var(--ok)':'var(--p)')+'">'+statusEmoji+' '+o.status+'</span></div>'+
+          '<div class="oh-meta">'+o.date+(o.time?' · '+o.time:'')+' · <span style="color:'+statusColor+'">'+statusEmoji+' '+o.status+'</span></div>'+
           '<div class="oh-total">₹'+o.total+' — Tap to hide/show details</div></div>'+
           '<span style="color:var(--p);font-size:1rem;padding:4px">▲</span></div>'+
         '<div id="od-'+o.id+'" style="display:block;margin-top:10px;padding-top:10px;border-top:1px solid var(--bd)">'+
@@ -3108,6 +3184,178 @@ function toggleOrderDetail(id){
 }
 
 // ---- ORDERS: DELETE (single / all) ----
+// ═══════════════════════════════════════════════
+// CANCEL ORDER SYSTEM
+// Rules: pending only, within 3 min, max 2/day
+// ═══════════════════════════════════════════════
+const CANCEL_WINDOW_MS = 3 * 60 * 1000; // 3 minutes
+const MAX_CANCELS_PER_DAY = 2;
+window._currentCancelOrderId = null;
+var _ocCancelTimerIv = null;
+
+function getCancelCount(){
+  try{
+    var data=JSON.parse(localStorage.getItem('bm_cancel_log')||'{"date":"","count":0}');
+    var today=new Date().toDateString();
+    if(data.date!==today) return 0;
+    return data.count||0;
+  }catch(e){return 0;}
+}
+
+function incrementCancelCount(){
+  var today=new Date().toDateString();
+  var count=getCancelCount()+1;
+  localStorage.setItem('bm_cancel_log',JSON.stringify({date:today,count:count}));
+}
+
+function canCancelOrder(order){
+  if(!order) return {ok:false,reason:'Order not found'};
+  var status=(order.status||'pending').toLowerCase();
+  if(status==='cancelled') return {ok:false,reason:'Already cancelled'};
+  if(status==='delivered') return {ok:false,reason:'Already delivered'};
+  if(status==='accepted')  return {ok:false,reason:'Order already accepted by delivery boy'};
+  var st=order.startTime;
+  if(st && typeof st==='object' && st.seconds) st=st.seconds*1000;
+  if(!st) return {ok:false,reason:'Order time unknown'};
+  if(Date.now()-st > CANCEL_WINDOW_MS) return {ok:false,reason:'Cancel window expired (3 min)'};
+  if(getCancelCount()>=MAX_CANCELS_PER_DAY) return {ok:false,reason:'Max 2 cancels per day reached'};
+  return {ok:true};
+}
+
+function selectCancelReason(label){
+  document.querySelectorAll('#cancelReasons label').forEach(function(l){
+    l.style.borderColor='var(--bd)';
+    l.style.background='';
+  });
+  label.style.borderColor='var(--p)';
+  label.style.background='#FFF6F3';
+  document.getElementById('cancelReasonErr').style.display='none';
+}
+
+function openCancelModal(orderId){
+  if(!orderId) return;
+  // Find order from local or firebase cache
+  var orders=[];
+  try{ orders=JSON.parse(localStorage.getItem('bm_orders')||'[]'); }catch(e){}
+  var order=orders.find(function(o){return o.id===orderId;});
+
+  // Check if cancellable
+  var check=canCancelOrder(order);
+  if(!check.ok){
+    bmAlert('Cannot Cancel',''+check.reason+'\n\nPlease call us: +91 96258 67683','warning');
+    return;
+  }
+
+  window._currentCancelOrderId=orderId;
+  // Reset modal state
+  document.querySelectorAll('input[name="cancelReason"]').forEach(function(r){r.checked=false;});
+  document.querySelectorAll('#cancelReasons label').forEach(function(l){
+    l.style.borderColor='var(--bd)'; l.style.background='';
+  });
+  document.getElementById('cancelReasonErr').style.display='none';
+  document.getElementById('cancelModalOrderId').textContent='Order #'+orderId;
+  document.getElementById('cancelModal').classList.add('on');
+  document.body.style.overflow='hidden';
+}
+
+function closeCancelModal(){
+  document.getElementById('cancelModal').classList.remove('on');
+  document.body.style.overflow='';
+  window._currentCancelOrderId=null;
+}
+
+async function confirmCancelOrder(){
+  var reason=document.querySelector('input[name="cancelReason"]:checked');
+  if(!reason){
+    document.getElementById('cancelReasonErr').style.display='block';
+    return;
+  }
+  var orderId=window._currentCancelOrderId;
+  var reasonText=reason.value;
+  if(!orderId) return;
+
+  // Disable button to prevent double tap
+  var btn=document.querySelector('#cancelModal button:last-child');
+  if(btn){btn.disabled=true;btn.textContent='Cancelling...';}
+
+  try{
+    // Update Firestore
+    if(typeof window.cancelOrderInFirebase==='function'){
+      await window.cancelOrderInFirebase(orderId, reasonText);
+    }
+
+    // Update localStorage
+    try{
+      var orders=JSON.parse(localStorage.getItem('bm_orders')||'[]');
+      orders=orders.map(function(o){
+        if(o.id===orderId){ o.status='Cancelled'; o.cancelReason=reasonText; o.cancelledAt=Date.now(); }
+        return o;
+      });
+      localStorage.setItem('bm_orders',JSON.stringify(orders));
+    }catch(e){}
+
+    // Increment daily cancel count
+    incrementCancelCount();
+
+    // Send Telegram notification
+    var user=JSON.parse(localStorage.getItem('bm_user')||'{}');
+    tg('order','🚫 <b>ORDER CANCELLED</b>\n──────────────\n🆔 #'+orderId+'\n👤 '+(user.name||'Customer')+'\n📱 '+(user.phone||'N/A')+'\n❓ <b>Reason:</b> '+reasonText+'\n⏰ '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
+
+    closeCancelModal();
+
+    // Update order confirm screen if visible
+    updateOcCancelBtn(orderId, true);
+
+    // Refresh order history
+    if(typeof renderProfileOrders==='function') renderProfileOrders();
+
+    bmAlert('Order Cancelled','Your order #'+orderId+' has been cancelled.\n\nReason: '+reasonText,'info');
+
+  }catch(e){
+    if(btn){btn.disabled=false;btn.textContent='Cancel Order';}
+    bmAlert('Error','Could not cancel order. Please call us: +91 96258 67683','warning');
+  }
+}
+
+// Update cancel button on order confirm screen
+function updateOcCancelBtn(orderId, cancelled){
+  var btn=document.getElementById('ocCancelBtn');
+  var timer=document.getElementById('ocCancelTimer');
+  if(!btn) return;
+  if(cancelled){
+    btn.style.display='none';
+    if(timer) timer.style.display='none';
+    if(_ocCancelTimerIv){ clearInterval(_ocCancelTimerIv); _ocCancelTimerIv=null; }
+    return;
+  }
+  btn.style.display='block';
+  btn.onclick=function(){ openCancelModal(orderId); };
+  // Countdown timer
+  var orders=[];
+  try{ orders=JSON.parse(localStorage.getItem('bm_orders')||'[]'); }catch(e){}
+  var order=orders.find(function(o){return o.id===orderId;});
+  var st=order&&order.startTime;
+  if(st && typeof st==='object' && st.seconds) st=st.seconds*1000;
+  if(!st) return;
+
+  if(_ocCancelTimerIv){ clearInterval(_ocCancelTimerIv); }
+  _ocCancelTimerIv=setInterval(function(){
+    var remaining=CANCEL_WINDOW_MS-(Date.now()-st);
+    if(remaining<=0){
+      clearInterval(_ocCancelTimerIv);
+      btn.style.display='none';
+      if(timer) timer.style.display='none';
+      return;
+    }
+    var mins=Math.floor(remaining/60000);
+    var secs=Math.floor((remaining%60000)/1000);
+    if(timer){
+      timer.style.display='block';
+      timer.textContent='⏱️ Cancel available for '+mins+':'+(secs<10?'0':'')+secs+' more';
+    }
+  },1000);
+}
+
 function deleteOrder(orderId){
   bmConfirm('Delete Order','Delete order #'+orderId+'? This cannot be undone.','Delete','Cancel','danger',function(){
     try{
@@ -3863,4 +4111,3 @@ initTodaySpecial();
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then(function(choice){
       if(choice.outcome === 'accepted'){
- 
