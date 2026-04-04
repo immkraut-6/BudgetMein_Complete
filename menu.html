@@ -566,7 +566,8 @@ window.cancelOrderInFirebase=async function(orderId, reason){
     var snap=await getDocs(q);
     var promises=[];
     snap.forEach(function(d){
-      if(d.data().id===orderId){
+      var oid=d.data().orderId||d.data().id||'';
+      if(oid===orderId){
         promises.push(updateDoc(doc(db,"orders",d.id),{
           status:"Cancelled",
           cancelReason:reason||"",
@@ -3203,7 +3204,14 @@ async function getOrderFromFirestore(orderId){
     var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
     var snap=await getDocs(q);
     var found=null;
-    snap.forEach(function(d){ if(d.data().id===orderId) found={_docId:d.id,...d.data()}; });
+    snap.forEach(function(d){
+      var data=d.data();
+      // Firestore stores field as "orderId", normalize to "id" for consistency
+      var oid=data.orderId||data.id||'';
+      if(oid===orderId){
+        found={_docId:d.id, id:oid, ...data};
+      }
+    });
     return found;
   }catch(e){ console.warn('getOrderFromFirestore err',e); return null; }
 }
