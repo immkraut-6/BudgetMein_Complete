@@ -416,16 +416,12 @@ async function tg(kind, msg){
 window.bmSaveOrder=async function(orderData){
   try{
     var nowMs=Date.now();
-    // ✅ FIX: Always use auth.currentUser.uid from inside the module scope.
-    // window._bmUserId can be empty if onAuthStateChanged hasn't fired yet,
-    // causing Firestore read/update rules (which check userId == auth.uid) to always fail.
-    var resolvedUid = (auth.currentUser && auth.currentUser.uid) || orderData.userId || window._bmUserId || '';
     var cleanItems=(orderData.itemsFull||[]).map(function(i){
       return{name:i.n||i.name||'',quantity:i.qty||i.quantity||1,price:i.p||i.price||0};
     });
     var firestoreData={
       orderId:       orderData.id,
-      userId:        resolvedUid,
+      userId:        orderData.userId||window._bmUserId||'',
       customerName:  orderData.name||'Guest',
       phone:         orderData.phone||'',
       address:       orderData.address||'',
@@ -565,22 +561,18 @@ window.markOrderDelivered=async function(orderId){
 };
 window.cancelOrderInFirebase=async function(orderId, reason){
   try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
-    var snap=await getDocs(q);
-    var promises=[];
-    snap.forEach(function(d){
-      var oid=d.data().orderId||d.data().id||'';
-      if(oid===orderId){
-        promises.push(updateDoc(doc(db,"orders",d.id),{
-          status:"Cancelled",
-          cancelReason:reason||"",
-          cancelledAt:Date.now()
-        }));
-      }
+    // Use getOrderFromFirestore which already handles the userId=="" fallback
+    var order=await getOrderFromFirestore(orderId);
+    if(!order||!order._docId){
+      console.warn('cancelOrderInFirebase: order not found for',orderId);
+      return false;
+    }
+    await updateDoc(doc(db,"orders",order._docId),{
+      status:"Cancelled",
+      cancelReason:reason||"",
+      cancelledAt:Date.now()
     });
-    await Promise.all(promises);
-    return promises.length>0;
+    return true;
   }catch(e){console.warn("cancelOrder err",e);return false;}
 };
 
@@ -613,19 +605,69 @@ window.deleteAllOrdersFromFirebase=async function(){
 };
 window.loadOrdersFromFirebase=async function(){
   try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
+    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
     if(!uid)return null;
-    var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
-    var snap=await getDocs(q);
-    var orders=[];
-    snap.forEach(function(d){
-      var data=d.data();
-      var oid=data.orderId||data.id||'';
-      var st=data.startTime;
-      if(st&&typeof st==='object'&&st.toMillis) st=st.toMillis();
-      else if(st&&typeof st==='object'&&st.seconds) st=st.seconds*1000;
-      orders.push({_docId:d.id,id:oid,...data,startTime:st});
-    });
+
+    var orderMap={};
+
+    // Primary: query by userId
+    try{
+      var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
+      var snap=await getDocs(q);
+      snap.forEach(function(d){
+        var data=d.data();
+        var oid=data.orderId||data.id||'';
+        var st=data.startTime;
+        if(st&&typeof st==='object'&&st.toMillis) st=st.toMillis();
+        else if(st&&typeof st==='object'&&st.seconds) st=st.seconds*1000;
+        orderMap[oid]={_docId:d.id,id:oid,...data,startTime:st};
+      });
+    }catch(e1){console.warn("FB load userId query err",e1);}
+
+    // Fallback: also query by email to catch old orders saved with userId=""
+    var localUser={};
+    try{localUser=JSON.parse(localStorage.getItem("bm_user")||'{}');}catch(e2){}
+    var userEmail=(localUser.email||(auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+    var userPhone=(localUser.phone||'').replace(/\D/g,'').slice(-10);
+
+    if(userEmail){
+      try{
+        var qe=query(collection(db,"orders"),where("email","==",userEmail),orderBy("startTime","desc"),limit(30));
+        var snape=await getDocs(qe);
+        snape.forEach(function(d){
+          var data=d.data();
+          var oid=data.orderId||data.id||'';
+          if(!orderMap[oid]){
+            var st=data.startTime;
+            if(st&&typeof st==='object'&&st.toMillis) st=st.toMillis();
+            else if(st&&typeof st==='object'&&st.seconds) st=st.seconds*1000;
+            orderMap[oid]={_docId:d.id,id:oid,...data,startTime:st};
+            // Patch missing userId
+            if(uid&&!data.userId) updateDoc(doc(db,"orders",d.id),{userId:uid}).catch(function(){});
+          }
+        });
+      }catch(e3){console.warn("FB load email query err",e3);}
+    }
+
+    if(userPhone && !userEmail){
+      try{
+        var qp=query(collection(db,"orders"),where("phone","==","+91 "+userPhone),orderBy("startTime","desc"),limit(30));
+        var snapp=await getDocs(qp);
+        snapp.forEach(function(d){
+          var data=d.data();
+          var oid=data.orderId||data.id||'';
+          if(!orderMap[oid]){
+            var st=data.startTime;
+            if(st&&typeof st==='object'&&st.toMillis) st=st.toMillis();
+            else if(st&&typeof st==='object'&&st.seconds) st=st.seconds*1000;
+            orderMap[oid]={_docId:d.id,id:oid,...data,startTime:st};
+            if(uid&&!data.userId) updateDoc(doc(db,"orders",d.id),{userId:uid}).catch(function(){});
+          }
+        });
+      }catch(e4){console.warn("FB load phone query err",e4);}
+    }
+
+    var orders=Object.values(orderMap).sort(function(a,b){return (b.startTime||0)-(a.startTime||0);});
     if(orders.length){
       localStorage.setItem("bm_orders",JSON.stringify(orders));
       return orders;
@@ -2129,8 +2171,7 @@ async function placeOrder(){
   const sub=keys.reduce(function(s,k){return s+(cart[k].p*cart[k].qty);},0);
   const platFee=(typeof PLATFORM_FEE!=='undefined')?PLATFORM_FEE:5;
   // Secure first-order free delivery — check Firestore, not localStorage
-  // ✅ FIX: Use currentUser.uid (from Firebase module) — more reliable than window._bmUserId
-  var _uid = currentUser.uid || window._bmUserId || '';
+  var _uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
   var _hasOrdered = _uid ? await bmCheckHasOrdered(_uid) : true;
   var del = _hasOrdered ? 25 : 0;  // Free delivery only for genuine first order
   var isFirstOrder = !_hasOrdered;
@@ -2170,8 +2211,7 @@ async function placeOrder(){
     email:user.email||'',
     status:'pending',
     deliveryBoyId:null,
-    // ✅ FIX: Use currentUser.uid directly — window._bmUserId can be '' if auth hasn't resolved yet
-    userId:currentUser.uid||window._bmUserId||'',
+    userId:window._bmUserId||'',
     startTime:nowMs
   };
   orders.unshift(orderObj);
@@ -2246,8 +2286,7 @@ async function placeOrder(){
     mapsQuery:orderObj.mapsQuery||deliveryAddress,
     status:'pending',
     deliveryBoyId:null,
-    // ✅ FIX: Use currentUser.uid directly — window._bmUserId can be '' if auth hasn't resolved yet
-    userId:currentUser.uid||window._bmUserId||'',
+    userId:window._bmUserId||'',
     date:orderObj.date,
     time:orderObj.time,
     startTime:nowMs
@@ -3308,17 +3347,63 @@ function toMs(st){
 
 async function getOrderFromFirestore(orderId){
   try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid||!orderId) return null;
-    var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
-    var snap=await getDocs(q);
-    var found=null;
-    snap.forEach(function(d){
-      var data=d.data();
-      var oid=data.orderId||data.id||'';
-      if(oid===orderId) found={_docId:d.id,id:oid,...data,startTime:toMs(data.startTime)};
-    });
-    return found;
+    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
+    if(!orderId) return null;
+
+    // Primary: query by userId (works for new orders)
+    if(uid){
+      try{
+        var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
+        var snap=await getDocs(q);
+        var found=null;
+        snap.forEach(function(d){
+          var data=d.data();
+          var oid=data.orderId||data.id||'';
+          if(oid===orderId) found={_docId:d.id,id:oid,...data,startTime:toMs(data.startTime)};
+        });
+        if(found) return found;
+      }catch(e){ console.warn('getOrderFromFirestore uid query err',e); }
+    }
+
+    // Fallback: old orders saved with userId="" — search by email then phone
+    var localUser={};
+    try{ localUser=JSON.parse(localStorage.getItem('bm_user')||'{}'); }catch(e2){}
+    var userEmail=(localUser.email||(auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+    var userPhone=(localUser.phone||'').replace(/\D/g,'').slice(-10);
+
+    if(userEmail){
+      try{
+        var qe=query(collection(db,'orders'),where('email','==',userEmail),orderBy('startTime','desc'),limit(30));
+        var snape=await getDocs(qe);
+        var fe=null;
+        snape.forEach(function(d){
+          var data=d.data(); var oid=data.orderId||data.id||'';
+          if(oid===orderId) fe={_docId:d.id,id:oid,...data,startTime:toMs(data.startTime)};
+        });
+        if(fe){
+          if(uid&&!fe.userId) updateDoc(doc(db,'orders',fe._docId),{userId:uid}).catch(function(){});
+          return fe;
+        }
+      }catch(e3){ console.warn('getOrderFromFirestore email query err',e3); }
+    }
+
+    if(userPhone){
+      try{
+        var qp=query(collection(db,'orders'),where('phone','==','+91 '+userPhone),orderBy('startTime','desc'),limit(30));
+        var snapp=await getDocs(qp);
+        var fp=null;
+        snapp.forEach(function(d){
+          var data=d.data(); var oid=data.orderId||data.id||'';
+          if(oid===orderId) fp={_docId:d.id,id:oid,...data,startTime:toMs(data.startTime)};
+        });
+        if(fp){
+          if(uid&&!fp.userId) updateDoc(doc(db,'orders',fp._docId),{userId:uid}).catch(function(){});
+          return fp;
+        }
+      }catch(e4){ console.warn('getOrderFromFirestore phone query err',e4); }
+    }
+
+    return null;
   }catch(e){console.warn('getOrderFromFirestore err',e);return null;}
 }
 
