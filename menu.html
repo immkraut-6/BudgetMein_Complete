@@ -3232,12 +3232,23 @@ function selectCancelReason(label){
   document.getElementById('cancelReasonErr').style.display='none';
 }
 
-function openCancelModal(orderId){
+async function openCancelModal(orderId){
   if(!orderId) return;
-  // Find order from local or firebase cache
+
+  // 1. Try localStorage first
   var orders=[];
   try{ orders=JSON.parse(localStorage.getItem('bm_orders')||'[]'); }catch(e){}
   var order=orders.find(function(o){return o.id===orderId;});
+
+  // 2. If not found locally, fetch from Firestore and sync to localStorage
+  if(!order && typeof window.loadOrdersFromFirebase==='function'){
+    try{
+      var fbOrders=await window.loadOrdersFromFirebase();
+      if(fbOrders && fbOrders.length){
+        order=fbOrders.find(function(o){return o.id===orderId;});
+      }
+    }catch(e){ console.warn('openCancelModal: Firestore fetch failed',e); }
+  }
 
   // Check if cancellable
   var check=canCancelOrder(order);
