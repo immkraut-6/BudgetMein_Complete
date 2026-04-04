@@ -413,6 +413,7 @@ async function tg(kind, msg){
     console.warn("Telegram notify failed", kind, e.message||e);
   }
 }
+window.tg = tg; // expose to regular scripts
 // ================================================================
 // CANCEL COUNT HELPERS — exposed to regular scripts
 // Must live here (module scope) so getDoc/updateDoc/etc are in scope
@@ -3436,7 +3437,7 @@ async function _confirmCancelOrderAsync(){
     await incrementCancelCount();
     // Telegram notification (non-blocking)
     var user=JSON.parse(localStorage.getItem('bm_user')||'{}')||{};
-    tg('order','\u{1F6AB} ORDER CANCELLED | #'+orderId+' | '+(user.name||'Customer')+' | '+(user.phone||'N/A')+' | Reason: '+reasonText);
+    tg('order','🚫 ORDER CANCELLED | #'+orderId+' | '+(user.name||'Customer')+' | '+(user.phone||'N/A')+' | Reason: '+reasonText);
     // Close the cancel modal
     closeCancelModal();
     // Update cancel button on order confirm screen
