@@ -631,165 +631,161 @@ window.loadOrdersFromFirebase=async function(){
 };
 
 // ================================================================
-// getOrderFromFirestore — MUST live in module scope so it has
-// access to db, auth, query, collection, where, getDocs, etc.
-// Regular <script> tags cannot use these Firebase imports.
+// ALL FUNCTIONS BELOW MUST LIVE IN MODULE SCOPE
+// They use db, auth, doc, updateDoc, getDoc, collection,
+// query, where, getDocs, orderBy, limit, serverTimestamp
+// — all of which are ONLY available inside this module script.
+// Regular <script> tags cannot use these.
 // ================================================================
+
+// ── getCancelCount ──
+window.getCancelCount = async function(){
+  try{
+    var uid = (auth.currentUser && auth.currentUser.uid) || window._bmUserId || '';
+    if(!uid) return 0;
+    var snap = await getDoc(doc(db,'users',uid));
+    if(!snap.exists()) return 0;
+    var data = snap.data().cancelLog || {};
+    if(data.date !== new Date().toDateString()) return 0;
+    return data.count || 0;
+  }catch(e){ return 0; }
+};
+
+// ── incrementCancelCount ──
+window.incrementCancelCount = async function(){
+  try{
+    var uid = (auth.currentUser && auth.currentUser.uid) || window._bmUserId || '';
+    if(!uid) return;
+    var current = await window.getCancelCount();
+    await updateDoc(doc(db,'users',uid),{
+      cancelLog:{ date:new Date().toDateString(), count:current+1 },
+      updatedAt:serverTimestamp()
+    });
+    console.log('[BM] cancelLog incremented');
+  }catch(e){ console.warn('[BM] incrementCancelCount err',e); }
+};
+
+// ── Helper: Firestore timestamp → milliseconds ──
+function _bmToMs(st){
+  if(!st) return null;
+  if(typeof st==='number') return st;
+  if(typeof st==='object' && st.toMillis) return st.toMillis();
+  if(typeof st==='object' && st.seconds) return st.seconds*1000;
+  return null;
+}
+
+// ── getOrderFromFirestore ──
+// Tries userId first, then falls back to email/phone for old orders saved with userId=""
 window.getOrderFromFirestore = async function(orderId){
   try{
     if(!orderId) return null;
     var uid = (auth.currentUser && auth.currentUser.uid) || window._bmUserId || '';
 
-    // ── Step 1: query by userId (works for new orders) ──
+    // Step 1: by userId
     if(uid){
       try{
-        var q = query(collection(db,'orders'), where('userId','==',uid), orderBy('startTime','desc'), limit(30));
+        var q = query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
         var snap = await getDocs(q);
         var found = null;
         snap.forEach(function(d){
-          var data = d.data();
-          var oid = data.orderId || data.id || '';
-          if(oid === orderId) found = Object.assign({_docId:d.id, id:oid}, data, {startTime: _toMs(data.startTime)});
+          var data=d.data(), oid=data.orderId||data.id||'';
+          if(oid===orderId) found=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});
         });
         if(found) return found;
-      }catch(e){ console.warn('[BM] getOrderFromFirestore uid query err', e); }
+      }catch(e1){ console.warn('[BM] getOrder uid err',e1); }
     }
 
-    // ── Step 2: fallback by email (old orders saved with userId="") ──
-    var localUser = {};
-    try{ localUser = JSON.parse(localStorage.getItem('bm_user')||'{}'); }catch(e2){}
-    var userEmail = (localUser.email || (auth.currentUser && auth.currentUser.email) || '').toLowerCase();
-    var userPhone = (localUser.phone || '').replace(/\D/g,'').slice(-10);
+    // Step 2: by email (old orders with userId="")
+    var lu={};
+    try{ lu=JSON.parse(localStorage.getItem('bm_user')||'{}'); }catch(e2){}
+    var email=(lu.email||(auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+    var phone=(lu.phone||'').replace(/\D/g,'').slice(-10);
 
-    if(userEmail){
+    if(email){
       try{
-        var qe = query(collection(db,'orders'), where('email','==',userEmail), orderBy('startTime','desc'), limit(30));
-        var snape = await getDocs(qe);
-        var fe = null;
-        snape.forEach(function(d){
-          var data = d.data();
-          var oid = data.orderId || data.id || '';
-          if(oid === orderId) fe = Object.assign({_docId:d.id, id:oid}, data, {startTime: _toMs(data.startTime)});
+        var qe=query(collection(db,'orders'),where('email','==',email),orderBy('startTime','desc'),limit(30));
+        var se=await getDocs(qe); var fe=null;
+        se.forEach(function(d){
+          var data=d.data(), oid=data.orderId||data.id||'';
+          if(oid===orderId) fe=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});
         });
         if(fe){
-          // Auto-patch missing userId so next query hits Step 1
-          if(uid && !fe.userId) updateDoc(doc(db,'orders',fe._docId),{userId:uid}).catch(function(){});
+          if(uid&&!fe.userId) updateDoc(doc(db,'orders',fe._docId),{userId:uid}).catch(function(){});
           return fe;
         }
-      }catch(e3){ console.warn('[BM] getOrderFromFirestore email query err', e3); }
+      }catch(e3){ console.warn('[BM] getOrder email err',e3); }
     }
 
-    // ── Step 3: fallback by phone ──
-    if(userPhone){
+    // Step 3: by phone
+    if(phone){
       try{
-        var qp = query(collection(db,'orders'), where('phone','==','+91 '+userPhone), orderBy('startTime','desc'), limit(30));
-        var snapp = await getDocs(qp);
-        var fp = null;
-        snapp.forEach(function(d){
-          var data = d.data();
-          var oid = data.orderId || data.id || '';
-          if(oid === orderId) fp = Object.assign({_docId:d.id, id:oid}, data, {startTime: _toMs(data.startTime)});
+        var qp=query(collection(db,'orders'),where('phone','==','+91 '+phone),orderBy('startTime','desc'),limit(30));
+        var sp=await getDocs(qp); var fp=null;
+        sp.forEach(function(d){
+          var data=d.data(), oid=data.orderId||data.id||'';
+          if(oid===orderId) fp=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});
         });
         if(fp){
-          if(uid && !fp.userId) updateDoc(doc(db,'orders',fp._docId),{userId:uid}).catch(function(){});
+          if(uid&&!fp.userId) updateDoc(doc(db,'orders',fp._docId),{userId:uid}).catch(function(){});
           return fp;
         }
-      }catch(e4){ console.warn('[BM] getOrderFromFirestore phone query err', e4); }
+      }catch(e4){ console.warn('[BM] getOrder phone err',e4); }
     }
 
     return null;
-  }catch(e){ console.warn('[BM] getOrderFromFirestore err', e); return null; }
+  }catch(e){ console.warn('[BM] getOrderFromFirestore err',e); return null; }
 };
 
-// Helper: convert Firestore timestamp to ms — used inside module
-function _toMs(st){
-  if(!st) return null;
-  if(typeof st === 'number') return st;
-  if(typeof st === 'object' && st.toMillis) return st.toMillis();
-  if(typeof st === 'object' && st.seconds) return st.seconds * 1000;
-  return null;
-}
-
-// Also move cancelOrderInFirebase into module so it uses module-scoped db
+// ── cancelOrderInFirebase ──
 window.cancelOrderInFirebase = async function(orderId, reason){
   try{
     var order = await window.getOrderFromFirestore(orderId);
-    if(!order || !order._docId){
-      console.warn('[BM] cancelOrderInFirebase: order not found', orderId);
-      return false;
-    }
+    if(!order||!order._docId){ console.warn('[BM] cancelOrder: not found',orderId); return false; }
     await updateDoc(doc(db,'orders',order._docId),{
-      status: 'Cancelled',
-      cancelReason: reason || '',
-      cancelledAt: Date.now()
+      status:'Cancelled', cancelReason:reason||'', cancelledAt:Date.now()
     });
-    console.log('[BM] ✅ Order cancelled in Firestore:', orderId);
+    console.log('[BM] Order cancelled in Firestore:',orderId);
     return true;
-  }catch(e){ console.warn('[BM] cancelOrderInFirebase err', e); return false; }
+  }catch(e){ console.warn('[BM] cancelOrderInFirebase err',e); return false; }
 };
 
-// Also move loadOrdersFromFirebase into module so it uses module-scoped db
+// ── loadOrdersFromFirebase ──
 window.loadOrdersFromFirebase = async function(){
   try{
-    var uid = (auth.currentUser && auth.currentUser.uid) || window._bmUserId || '';
+    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
     if(!uid) return null;
-    var orderMap = {};
-
-    // Primary: by userId
+    var map={};
+    // Primary: userId
     try{
-      var q = query(collection(db,'orders'), where('userId','==',uid), orderBy('startTime','desc'), limit(30));
-      var snap = await getDocs(q);
-      snap.forEach(function(d){
-        var data = d.data();
-        var oid = data.orderId || data.id || '';
-        var st = _toMs(data.startTime);
-        orderMap[oid] = Object.assign({_docId:d.id, id:oid}, data, {startTime:st});
+      var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
+      var s=await getDocs(q);
+      s.forEach(function(d){
+        var data=d.data(),oid=data.orderId||data.id||'';
+        map[oid]=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});
       });
-    }catch(e1){ console.warn('[BM] loadOrders uid query err', e1); }
-
-    // Fallback: by email (old orders)
-    var localUser = {};
-    try{ localUser = JSON.parse(localStorage.getItem('bm_user')||'{}'); }catch(e2){}
-    var userEmail = (localUser.email || (auth.currentUser && auth.currentUser.email) || '').toLowerCase();
-    var userPhone = (localUser.phone || '').replace(/\D/g,'').slice(-10);
-
-    if(userEmail){
+    }catch(e1){ console.warn('[BM] loadOrders uid err',e1); }
+    // Fallback: email
+    var lu={};
+    try{ lu=JSON.parse(localStorage.getItem('bm_user')||'{}'); }catch(e2){}
+    var email=(lu.email||(auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
+    var phone=(lu.phone||'').replace(/\D/g,'').slice(-10);
+    if(email){
       try{
-        var qe = query(collection(db,'orders'), where('email','==',userEmail), orderBy('startTime','desc'), limit(30));
-        var snape = await getDocs(qe);
-        snape.forEach(function(d){
-          var data = d.data(); var oid = data.orderId || data.id || '';
-          if(!orderMap[oid]){
-            var st = _toMs(data.startTime);
-            orderMap[oid] = Object.assign({_docId:d.id, id:oid}, data, {startTime:st});
-            if(uid && !data.userId) updateDoc(doc(db,'orders',d.id),{userId:uid}).catch(function(){});
+        var qe=query(collection(db,'orders'),where('email','==',email),orderBy('startTime','desc'),limit(30));
+        var se=await getDocs(qe);
+        se.forEach(function(d){
+          var data=d.data(),oid=data.orderId||data.id||'';
+          if(!map[oid]){
+            map[oid]=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});
+            if(uid&&!data.userId) updateDoc(doc(db,'orders',d.id),{userId:uid}).catch(function(){});
           }
         });
-      }catch(e3){ console.warn('[BM] loadOrders email query err', e3); }
+      }catch(e3){ console.warn('[BM] loadOrders email err',e3); }
     }
-
-    if(userPhone && !userEmail){
-      try{
-        var qp = query(collection(db,'orders'), where('phone','==','+91 '+userPhone), orderBy('startTime','desc'), limit(30));
-        var snapp = await getDocs(qp);
-        snapp.forEach(function(d){
-          var data = d.data(); var oid = data.orderId || data.id || '';
-          if(!orderMap[oid]){
-            var st = _toMs(data.startTime);
-            orderMap[oid] = Object.assign({_docId:d.id, id:oid}, data, {startTime:st});
-            if(uid && !data.userId) updateDoc(doc(db,'orders',d.id),{userId:uid}).catch(function(){});
-          }
-        });
-      }catch(e4){ console.warn('[BM] loadOrders phone query err', e4); }
-    }
-
-    var orders = Object.values(orderMap).sort(function(a,b){ return (b.startTime||0)-(a.startTime||0); });
-    if(orders.length){
-      localStorage.setItem('bm_orders', JSON.stringify(orders));
-      return orders;
-    }
+    var orders=Object.values(map).sort(function(a,b){return (b.startTime||0)-(a.startTime||0);});
+    if(orders.length){ localStorage.setItem('bm_orders',JSON.stringify(orders)); return orders; }
     return null;
-  }catch(e){ console.warn('[BM] loadOrdersFromFirebase err', e); return null; }
+  }catch(e){ console.warn('[BM] loadOrdersFromFirebase err',e); return null; }
 };
 </script>
 
@@ -3462,36 +3458,18 @@ function toMs(st){
 }
 
 async function getOrderFromFirestore(orderId){
-  // Delegate to window.getOrderFromFirestore which lives in the Firebase module
-  // and has access to db, auth, query, collection, where, getDocs, etc.
-  if(typeof window.getOrderFromFirestore === 'function'){
-    return window.getOrderFromFirestore(orderId);
-  }
+  // Delegates to window.getOrderFromFirestore (defined in module script with full Firebase access)
+  if(typeof window.getOrderFromFirestore==='function') return window.getOrderFromFirestore(orderId);
   return null;
 }
 
 async function getCancelCount(){
-  try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid) return 0;
-    var snap=await getDoc(doc(db,'users',uid));
-    if(!snap.exists()) return 0;
-    var data=snap.data().cancelLog||{};
-    if(data.date!==new Date().toDateString()) return 0;
-    return data.count||0;
-  }catch(e){return 0;}
+  if(typeof window.getCancelCount==='function') return window.getCancelCount();
+  return 0;
 }
 
 async function incrementCancelCount(){
-  try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid) return;
-    var current=await getCancelCount();
-    await updateDoc(doc(db,'users',uid),{
-      cancelLog:{date:new Date().toDateString(),count:current+1},
-      updatedAt:serverTimestamp()
-    });
-  }catch(e){console.warn('incrementCancelCount err',e);}
+  if(typeof window.incrementCancelCount==='function') return window.incrementCancelCount();
 }
 
 async function canCancelOrder(order){
@@ -3644,8 +3622,8 @@ async function confirmCancelOrder(){
       localStorage.setItem('bm_orders',JSON.stringify(orders));
     }catch(e){}
 
-    // Increment daily cancel count in Firestore
-    await incrementCancelCount();
+    // Increment daily cancel count in Firestore (best-effort — must NOT crash the success flow)
+    try{ await incrementCancelCount(); }catch(e){ console.warn('[BM] incrementCancelCount err',e); }
 
     // Send Telegram notification
     var user=JSON.parse(localStorage.getItem('bm_user')||'{}');
