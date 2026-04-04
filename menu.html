@@ -413,6 +413,60 @@ async function tg(kind, msg){
     console.warn("Telegram notify failed", kind, e.message||e);
   }
 }
+// ================================================================
+// CANCEL COUNT HELPERS — exposed to regular scripts
+// Must live here (module scope) so getDoc/updateDoc/etc are in scope
+// ================================================================
+window.bmGetCancelCount = async function(){
+  try{
+    var uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
+    if(!uid) return 0;
+    var snap = await getDoc(doc(db,'users',uid));
+    if(!snap.exists()) return 0;
+    var data = snap.data().cancelLog || {};
+    if(data.date !== new Date().toDateString()) return 0;
+    return data.count || 0;
+  }catch(e){ return 0; }
+};
+window.bmIncrementCancelCount = async function(){
+  try{
+    var uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
+    if(!uid) return;
+    var current = await window.bmGetCancelCount();
+    await updateDoc(doc(db,'users',uid),{
+      cancelLog:{date:new Date().toDateString(), count:current+1},
+      updatedAt:serverTimestamp()
+    });
+  }catch(e){ console.warn('bmIncrementCancelCount err',e); }
+};
+
+// ================================================================
+// GET ORDER FROM FIRESTORE — exposed to regular scripts
+// Must live here (module scope) so query/collection/etc are in scope
+// ================================================================
+window.bmGetOrderFromFirestore = async function(orderId){
+  try{
+    var uid = window._bmUserId || (auth.currentUser && auth.currentUser.uid) || '';
+    if(!uid || !orderId) return null;
+    var q = query(collection(db,'orders'), where('userId','==',uid), orderBy('startTime','desc'), limit(30));
+    var snap = await getDocs(q);
+    var found = null;
+    snap.forEach(function(d){
+      var data = d.data();
+      var oid = data.orderId || data.id || '';
+      if(oid === orderId){
+        var st = data.startTime;
+        var stMs = st && st.toMillis ? st.toMillis() : (typeof st === 'number' ? st : 0);
+        found = Object.assign({}, data, {_docId: d.id, id: oid, startTime: stMs});
+      }
+    });
+    return found;
+  }catch(e){
+    console.warn('bmGetOrderFromFirestore err', e);
+    return null;
+  }
+};
+
 window.bmSaveOrder=async function(orderData){
   try{
     var nowMs=Date.now();
@@ -3300,43 +3354,15 @@ function toMs(st){
 }
 
 async function getOrderFromFirestore(orderId){
-  try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid||!orderId) return null;
-    var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
-    var snap=await getDocs(q);
-    var found=null;
-    snap.forEach(function(d){
-      var data=d.data();
-      var oid=data.orderId||data.id||'';
-      if(oid===orderId) found={_docId:d.id,id:oid,...data,startTime:toMs(data.startTime)};
-    });
-    return found;
-  }catch(e){console.warn('getOrderFromFirestore err',e);return null;}
+  // Delegates to module-scoped helper so Firebase imports (query, collection, etc.) are in scope
+  return window.bmGetOrderFromFirestore(orderId);
 }
 
 async function getCancelCount(){
-  try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid) return 0;
-    var snap=await getDoc(doc(db,'users',uid));
-    if(!snap.exists()) return 0;
-    var data=snap.data().cancelLog||{};
-    if(data.date!==new Date().toDateString()) return 0;
-    return data.count||0;
-  }catch(e){return 0;}
+  return window.bmGetCancelCount();
 }
-
 async function incrementCancelCount(){
-  try{
-    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    if(!uid) return;
-    var current=await getCancelCount();
-    await updateDoc(doc(db,'users',uid),{
-      cancelLog:{date:new Date().toDateString(),count:current+1},
-      updatedAt:serverTimestamp()
-    });
-  }catch(e){console.warn('incrementCancelCount err',e);}
+  return window.bmIncrementCancelCount();
 }
 
 async function canCancelOrder(order){
