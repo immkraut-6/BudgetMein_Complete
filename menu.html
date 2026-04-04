@@ -629,124 +629,6 @@ window.loadOrdersFromFirebase=async function(){
     return null;
   }catch(e){console.warn("FB load err",e);return null;}
 };
-
-// ================================================================
-// FIREBASE HELPER FUNCTIONS — must live in module scope
-// Regular <script> tags cannot access db, auth, query, etc.
-// ================================================================
-
-function _bmToMs(st){
-  if(!st) return null;
-  if(typeof st==='number') return st;
-  if(typeof st==='object'&&st.toMillis) return st.toMillis();
-  if(typeof st==='object'&&st.seconds) return st.seconds*1000;
-  return null;
-}
-
-window.getCancelCount=async function(){
-  try{
-    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
-    if(!uid) return 0;
-    var snap=await getDoc(doc(db,'users',uid));
-    if(!snap.exists()) return 0;
-    var d=snap.data().cancelLog||{};
-    if(d.date!==new Date().toDateString()) return 0;
-    return d.count||0;
-  }catch(e){return 0;}
-};
-
-window.incrementCancelCount=async function(){
-  try{
-    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
-    if(!uid) return;
-    var current=await window.getCancelCount();
-    await updateDoc(doc(db,'users',uid),{cancelLog:{date:new Date().toDateString(),count:current+1},updatedAt:serverTimestamp()});
-    console.log('[BM] cancelLog incremented');
-  }catch(e){console.warn('[BM] incrementCancelCount err',e);}
-};
-
-window.getOrderFromFirestore=async function(orderId){
-  try{
-    if(!orderId) return null;
-    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
-    // Step 1: by userId
-    if(uid){
-      try{
-        var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
-        var snap=await getDocs(q);
-        var found=null;
-        snap.forEach(function(d){var data=d.data(),oid=data.orderId||data.id||'';if(oid===orderId)found=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});});
-        if(found) return found;
-      }catch(e1){console.warn('[BM] getOrder uid err',e1);}
-    }
-    // Step 2: by email — no orderBy to avoid index requirement
-    var lu={};
-    try{lu=JSON.parse(localStorage.getItem('bm_user')||'{}');}catch(e2){}
-    var email=(lu.email||(auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
-    var phone=(lu.phone||'').replace(/\D/g,'').slice(-10);
-    if(email){
-      try{
-        var qe=query(collection(db,'orders'),where('email','==',email),limit(30));
-        var se=await getDocs(qe);var fe=null;
-        se.forEach(function(d){var data=d.data(),oid=data.orderId||data.id||'';if(oid===orderId)fe=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});});
-        if(fe){if(uid&&!fe.userId)updateDoc(doc(db,'orders',fe._docId),{userId:uid}).catch(function(){});return fe;}
-      }catch(e3){console.warn('[BM] getOrder email err',e3);}
-    }
-    // Step 3: by phone — no orderBy to avoid index requirement
-    if(phone){
-      try{
-        var qp=query(collection(db,'orders'),where('phone','==','+91 '+phone),limit(30));
-        var sp=await getDocs(qp);var fp=null;
-        sp.forEach(function(d){var data=d.data(),oid=data.orderId||data.id||'';if(oid===orderId)fp=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});});
-        if(fp){if(uid&&!fp.userId)updateDoc(doc(db,'orders',fp._docId),{userId:uid}).catch(function(){});return fp;}
-      }catch(e4){console.warn('[BM] getOrder phone err',e4);}
-    }
-    return null;
-  }catch(e){console.warn('[BM] getOrderFromFirestore err',e);return null;}
-};
-
-window.cancelOrderInFirebase=async function(orderId,reason){
-  try{
-    var order=await window.getOrderFromFirestore(orderId);
-    if(!order||!order._docId){console.warn('[BM] cancelOrder: not found',orderId);return false;}
-    await updateDoc(doc(db,'orders',order._docId),{status:'Cancelled',cancelReason:reason||'',cancelledAt:Date.now()});
-    console.log('[BM] Order cancelled in Firestore:',orderId);
-    return true;
-  }catch(e){console.warn('[BM] cancelOrderInFirebase err',e);return false;}
-};
-
-window.loadOrdersFromFirebase=async function(){
-  try{
-    var uid=(auth.currentUser&&auth.currentUser.uid)||window._bmUserId||'';
-    if(!uid) return null;
-    var map={};
-    try{
-      var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
-      var s=await getDocs(q);
-      s.forEach(function(d){var data=d.data(),oid=data.orderId||data.id||'';map[oid]=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});});
-    }catch(e1){console.warn('[BM] loadOrders uid err',e1);}
-    var lu={};try{lu=JSON.parse(localStorage.getItem('bm_user')||'{}');}catch(e2){}
-    var email=(lu.email||(auth.currentUser&&auth.currentUser.email)||'').toLowerCase();
-    var phone=(lu.phone||'').replace(/\D/g,'').slice(-10);
-    if(email){
-      try{
-        var qe=query(collection(db,'orders'),where('email','==',email),limit(30));
-        var se=await getDocs(qe);
-        se.forEach(function(d){var data=d.data(),oid=data.orderId||data.id||'';if(!map[oid]){map[oid]=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});if(uid&&!data.userId)updateDoc(doc(db,'orders',d.id),{userId:uid}).catch(function(){});}});
-      }catch(e3){console.warn('[BM] loadOrders email err',e3);}
-    }
-    if(phone&&!email){
-      try{
-        var qp=query(collection(db,'orders'),where('phone','==','+91 '+phone),limit(30));
-        var sp=await getDocs(qp);
-        sp.forEach(function(d){var data=d.data(),oid=data.orderId||data.id||'';if(!map[oid]){map[oid]=Object.assign({_docId:d.id,id:oid},data,{startTime:_bmToMs(data.startTime)});if(uid&&!data.userId)updateDoc(doc(db,'orders',d.id),{userId:uid}).catch(function(){});}});
-      }catch(e4){console.warn('[BM] loadOrders phone err',e4);}
-    }
-    var orders=Object.values(map).sort(function(a,b){return(b.startTime||0)-(a.startTime||0);});
-    if(orders.length){localStorage.setItem('bm_orders',JSON.stringify(orders));return orders;}
-    return null;
-  }catch(e){console.warn('[BM] loadOrdersFromFirebase err',e);return null;}
-};
 </script>
 
 <style>
@@ -3418,17 +3300,43 @@ function toMs(st){
 }
 
 async function getOrderFromFirestore(orderId){
-  if(typeof window.getOrderFromFirestore==='function') return window.getOrderFromFirestore(orderId);
-  return null;
+  try{
+    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
+    if(!uid||!orderId) return null;
+    var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
+    var snap=await getDocs(q);
+    var found=null;
+    snap.forEach(function(d){
+      var data=d.data();
+      var oid=data.orderId||data.id||'';
+      if(oid===orderId) found={_docId:d.id,id:oid,...data,startTime:toMs(data.startTime)};
+    });
+    return found;
+  }catch(e){console.warn('getOrderFromFirestore err',e);return null;}
 }
 
 async function getCancelCount(){
-  if(typeof window.getCancelCount==='function') return window.getCancelCount();
-  return 0;
+  try{
+    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
+    if(!uid) return 0;
+    var snap=await getDoc(doc(db,'users',uid));
+    if(!snap.exists()) return 0;
+    var data=snap.data().cancelLog||{};
+    if(data.date!==new Date().toDateString()) return 0;
+    return data.count||0;
+  }catch(e){return 0;}
 }
 
 async function incrementCancelCount(){
-  if(typeof window.incrementCancelCount==='function') return window.incrementCancelCount();
+  try{
+    var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
+    if(!uid) return;
+    var current=await getCancelCount();
+    await updateDoc(doc(db,'users',uid),{
+      cancelLog:{date:new Date().toDateString(),count:current+1},
+      updatedAt:serverTimestamp()
+    });
+  }catch(e){console.warn('incrementCancelCount err',e);}
 }
 
 async function canCancelOrder(order){
@@ -3495,25 +3403,27 @@ async function _confirmCancelOrderAsync(){
     tg('order','\uD83D\uDEAB <b>ORDER CANCELLED</b>\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\uD83C\uDD94 #'+orderId+'\n\uD83D\uDC64 '+(user.name||'Customer')+'\n\uD83D\uDCF1 '+(user.phone||'N/A')+'\n\u2753 <b>Reason:</b> '+reasonText+'\n\u23F0 '+new Date().toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}));
     closeCancelModal();
     updateOcCancelBtn(orderId,true);
-    // Refresh UI safely — pass orders from localStorage, never trigger Firestore calls here
-    try{
-      var freshOrders=JSON.parse(localStorage.getItem('bm_orders')||'[]');
-      if(typeof renderProfileOrders==='function') renderProfileOrders(freshOrders);
-    }catch(re){console.warn('[BM] refresh UI err',re);}
-    bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\nReason: '+reasonText,'info');
+    if(typeof showOrderHistory==='function') showOrderHistory();
+    else if(typeof renderProfileOrders==='function') renderProfileOrders();
+    bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\nReason: '+reasonText,'info',function(){
+      // Hide the cancel button for this order in the profile list
+      try{
+        var cancelBtns=document.querySelectorAll('[onclick*="openCancelModal(\''+orderId+'\')"]');
+        cancelBtns.forEach(function(b){b.style.display='none';});
+        // Also mark the order status text as Cancelled in the UI
+        var ohItem=document.getElementById('od-'+orderId);
+        if(ohItem){
+          var statusSpan=ohItem.previousElementSibling&&ohItem.previousElementSibling.querySelector('.oh-meta span');
+          if(statusSpan){statusSpan.style.color='var(--er)';statusSpan.textContent='🚫 Cancelled';}
+        }
+        // Refresh the full order list from localStorage
+        var fo=JSON.parse(localStorage.getItem('bm_orders')||'[]');
+        if(typeof renderProfileOrders==='function') renderProfileOrders(fo);
+      }catch(re){console.warn('[BM] post-cancel UI err',re);}
+    });
   }catch(e){
-    console.error('[BM] _confirmCancelOrderAsync err',e);
+    console.error('confirmCancelOrder err',e);
     if(btn){btn.disabled=false;btn.textContent='Cancel Order';}
-    // Order may have succeeded even if something crashed after — check localStorage
-    try{
-      var ords=JSON.parse(localStorage.getItem('bm_orders')||'[]');
-      var done=ords.some(function(o){return(o.id===orderId||o.orderId===orderId)&&o.status==='Cancelled';});
-      if(done){
-        try{var fo=JSON.parse(localStorage.getItem('bm_orders')||'[]');if(typeof renderProfileOrders==='function')renderProfileOrders(fo);}catch(e2){}
-        bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\nReason: '+reasonText,'info');
-        return;
-      }
-    }catch(ce){}
     bmAlert('Error','Could not cancel order. Please call us: +91 96258 67683','warning');
   }
 }
@@ -3606,27 +3516,28 @@ async function confirmCancelOrder(){
     // Update order confirm screen if visible
     updateOcCancelBtn(orderId, true);
 
-    // Refresh order history — use localStorage (already updated above), don't call Firestore
-    try{
-      var freshOrders = JSON.parse(localStorage.getItem('bm_orders')||'[]');
-      if(typeof renderProfileOrders==='function') renderProfileOrders(freshOrders);
-    }catch(re){ console.warn('[BM] refresh orders UI err',re); }
+    // Refresh order history
+    if(typeof renderProfileOrders==='function') renderProfileOrders();
 
-    bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\n\nReason: '+reasonText,'info');
+    bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\n\nReason: '+reasonText,'info',function(){
+      // Hide the cancel button for this order in the profile list
+      try{
+        var cancelBtns=document.querySelectorAll('[onclick*="openCancelModal(\''+orderId+'\')"]');
+        cancelBtns.forEach(function(b){b.style.display='none';});
+        // Also mark the order status text as Cancelled in the UI
+        var ohItem=document.getElementById('od-'+orderId);
+        if(ohItem){
+          var statusSpan=ohItem.previousElementSibling&&ohItem.previousElementSibling.querySelector('.oh-meta span');
+          if(statusSpan){statusSpan.style.color='var(--er)';statusSpan.textContent='🚫 Cancelled';}
+        }
+        // Refresh the full order list from localStorage
+        var fo=JSON.parse(localStorage.getItem('bm_orders')||'[]');
+        if(typeof renderProfileOrders==='function') renderProfileOrders(fo);
+      }catch(re){console.warn('[BM] post-cancel UI err',re);}
+    });
 
   }catch(e){
-    console.error('[BM] confirmCancelOrder outer err',e);
     if(btn){btn.disabled=false;btn.textContent='Cancel Order';}
-    // Check if order actually got cancelled despite the error
-    try{
-      var ords=JSON.parse(localStorage.getItem('bm_orders')||'[]');
-      var alreadyCancelled=ords.some(function(o){return (o.id===orderId||o.orderId===orderId)&&o.status==='Cancelled';});
-      if(alreadyCancelled){
-        try{ var fo=JSON.parse(localStorage.getItem('bm_orders')||'[]'); if(typeof renderProfileOrders==='function') renderProfileOrders(fo); }catch(e2){}
-        bmAlert('Order Cancelled ✅','Your order #'+orderId+' has been cancelled.\n\nReason: '+reasonText,'info');
-        return;
-      }
-    }catch(ce){}
     bmAlert('Error','Could not cancel order. Please call us: +91 96258 67683','warning');
   }
 }
@@ -3843,11 +3754,14 @@ function logoutUser(){
 
 // ---- CUSTOM ALERT / CONFIRM SYSTEM ----
 var _bmAlertCb=null;
-function bmAlert(title,msg,type){
+var _bmAlertOkCb=null;
+function bmAlert(title,msg,type,onOk){
   var icons={success:'✅',error:'❌',info:'ℹ️',warning:'⚠️',location:'📍',profile:'👤'};
   document.getElementById('bmAlertIcon').textContent=icons[type]||'ℹ️';
   document.getElementById('bmAlertTitle').textContent=title;
   document.getElementById('bmAlertMsg').textContent=msg;
+  // Store optional OK callback so bmAlertClose can fire it
+  _bmAlertOkCb = (typeof onOk==='function') ? onOk : null;
   document.getElementById('bmAlertBtns').innerHTML='<button class="bm-btn-ok" onclick="bmAlertClose()">OK</button>';
   document.getElementById('bmAlertOverlay').classList.add('on');
   document.body.style.overflow='hidden';
@@ -3868,6 +3782,9 @@ function bmAlertClose(){
   document.getElementById('bmAlertOverlay').classList.remove('on');
   document.body.style.overflow='';
   _bmAlertCb=null;
+  // Fire the OK callback if set (used e.g. after order cancel to hide cancel button)
+  if(typeof _bmAlertOkCb==='function'){var cb=_bmAlertOkCb;_bmAlertOkCb=null;cb();}
+  else{_bmAlertOkCb=null;}
 }
 function bmAlertConfirm(){
   document.getElementById('bmAlertOverlay').classList.remove('on');
