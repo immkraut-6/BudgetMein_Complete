@@ -562,15 +562,17 @@ window.markOrderDelivered=async function(orderId){
 window.cancelOrderInFirebase=async function(orderId, reason){
   try{
     var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
-    var q=query(collection(db,"orders"),where("userId","==",uid),where("id","==",orderId),limit(5));
+    var q=query(collection(db,"orders"),where("userId","==",uid),orderBy("startTime","desc"),limit(30));
     var snap=await getDocs(q);
     var promises=[];
     snap.forEach(function(d){
-      promises.push(updateDoc(doc(db,"orders",d.id),{
-        status:"Cancelled",
-        cancelReason:reason||"",
-        cancelledAt:Date.now()
-      }));
+      if(d.data().id===orderId){
+        promises.push(updateDoc(doc(db,"orders",d.id),{
+          status:"Cancelled",
+          cancelReason:reason||"",
+          cancelledAt:Date.now()
+        }));
+      }
     });
     await Promise.all(promises);
     return promises.length>0;
@@ -3198,11 +3200,11 @@ async function getOrderFromFirestore(orderId){
   try{
     var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||'';
     if(!uid||!orderId) return null;
-    var q=query(collection(db,'orders'),where('userId','==',uid),where('id','==',orderId),limit(5));
+    var q=query(collection(db,'orders'),where('userId','==',uid),orderBy('startTime','desc'),limit(30));
     var snap=await getDocs(q);
-    if(snap.empty) return null;
-    var d=snap.docs[0];
-    return {_docId:d.id,...d.data()};
+    var found=null;
+    snap.forEach(function(d){ if(d.data().id===orderId) found={_docId:d.id,...d.data()}; });
+    return found;
   }catch(e){ console.warn('getOrderFromFirestore err',e); return null; }
 }
 
@@ -3263,16 +3265,9 @@ function selectCancelReason(label){
 async function openCancelModal(orderId){
   if(!orderId) return;
 
-  // Show loading state on cancel button
-  var triggerBtn=document.querySelector('[onclick*="openCancelModal(\''+orderId)');
-  if(triggerBtn){ triggerBtn.disabled=true; triggerBtn.textContent='Checking...'; }
-
   try{
     // Always fetch fresh order data from Firestore
     var order=await getOrderFromFirestore(orderId);
-
-    // Restore button
-    if(triggerBtn){ triggerBtn.disabled=false; triggerBtn.innerHTML='🚫 Cancel'; }
 
     // Check if cancellable (reads cancel count from Firestore too)
     var check=await canCancelOrder(order);
@@ -3292,7 +3287,6 @@ async function openCancelModal(orderId){
     document.getElementById('cancelModal').classList.add('on');
     document.body.style.overflow='hidden';
   }catch(e){
-    if(triggerBtn){ triggerBtn.disabled=false; triggerBtn.innerHTML='🚫 Cancel'; }
     bmAlert('Error','Could not load order. Please try again.','error');
   }
 }
@@ -4145,4 +4139,3 @@ initTodaySpecial();
     deferredPrompt.prompt();
     deferredPrompt.userChoice.then(function(choice){
       if(choice.outcome === 'accepted'){
- 
