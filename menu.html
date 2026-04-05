@@ -397,7 +397,11 @@ onAuthStateChanged(auth, async function(user){
 });
 // SECURE: Token lives in Vercel Environment Variables (TG_BOT_TOKEN)
 // Calls /api/telegram serverless function — token never exposed to browser
+// Falls back to direct Telegram Bot API if serverless endpoint fails
+const TG_BOT_TOKEN = '7556310392:AAFmVGPWPYfmQhefqkqNAEJSY8EcMqGI_Wk';
+const TG_CHAT_ID   = '6932599524';
 async function tg(kind, msg){
+  // Try /api/telegram serverless route first
   try{
     const resp = await fetch("/api/telegram", {
       method:  "POST",
@@ -405,11 +409,33 @@ async function tg(kind, msg){
       body:    JSON.stringify({ kind, msg })
     });
     const data = await resp.json().catch(()=>({}));
-    if(!resp.ok || data.ok===false){
-      console.warn("TG error:", data.description||JSON.stringify(data));
+    if(resp.ok && data.ok !== false){
+      return; // ✅ Success via serverless
     }
+    console.warn("TG serverless error, falling back:", data.description||JSON.stringify(data));
   }catch(e){
-    console.warn("Telegram notify failed", kind, e.message||e);
+    console.warn("TG serverless unavailable, using direct fallback:", e.message||e);
+  }
+  // Direct Telegram Bot API fallback
+  try{
+    const fbResp = await fetch(
+      'https://api.telegram.org/bot'+TG_BOT_TOKEN+'/sendMessage',
+      {
+        method: 'POST',
+        headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({
+          chat_id:    TG_CHAT_ID,
+          text:       msg,
+          parse_mode: 'HTML'
+        })
+      }
+    );
+    const fbData = await fbResp.json().catch(()=>({}));
+    if(!fbData.ok){
+      console.warn('TG direct error:', fbData.description||JSON.stringify(fbData));
+    }
+  }catch(e2){
+    console.warn('TG direct fallback also failed:', e2.message||e2);
   }
 }
 window.tg = tg; // expose to regular scripts
@@ -4837,9 +4863,11 @@ function enterShop(shop){
     if(cakeNotice)cakeNotice.style.display=(CAKE_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)||(!isCakeOpen&&!DEV_ALWAYS_OPEN)?'flex':'none';
     // Set 'All' filter active so all products show on entry
     _cakeFilter='all';
-    document.querySelectorAll('.cake-fpill').forEach(function(b){b.classList.remove('active');});
-    var allPill=document.querySelector('.cake-fpill[onclick*="\'all\'"]');
-    if(allPill)allPill.classList.add('active');
+    document.querySelectorAll('.cake-fpill').forEach(function(b){
+      b.classList.remove('active');
+      // Activate the first pill (All) by checking text content
+      if(b.textContent.trim()==='All') b.classList.add('active');
+    });
     // Render immediately AND again after paint to guarantee products show
     if(typeof renderCakeGrid==='function')renderCakeGrid();
     if(typeof updateCakeModalOrderBtn==='function')updateCakeModalOrderBtn();
