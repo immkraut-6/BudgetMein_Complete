@@ -1197,42 +1197,74 @@ nav{padding:0 12px;height:56px;gap:8px}
 
 <!-- CAKE DETAIL MODAL -->
 <div class="modal-overlay" id="cakeModal" onclick="if(event.target===this)closeCakeModal()">
-  <div class="modal" style="max-height:90vh;overflow-y:auto">
+  <div class="modal" style="max-height:92vh;overflow-y:auto">
     <div class="modal-head">
       <h3 id="cm-name">Cake</h3>
       <button class="sclose" onclick="closeCakeModal()">✕</button>
     </div>
-    <div class="modal-body" style="padding-bottom:20px">
-      <div style="width:100%;height:190px;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#FFF6F3">
+    <div class="modal-body" style="padding-bottom:24px">
+
+      <!-- Image -->
+      <div style="width:100%;height:200px;border-radius:12px;overflow:hidden;margin-bottom:14px;background:#FFF6F3">
         <img id="cm-img" src="" alt="" style="width:100%;height:100%;object-fit:cover;display:block"/>
       </div>
       <div id="cm-badge" style="display:none;margin-bottom:8px"></div>
-      <div style="font-size:.82rem;color:var(--mu);margin-bottom:14px" id="cm-flavour-default"></div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-bottom:6px">Size &amp; Price</div>
-      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px" id="cm-weights"></div>
+      <!-- Size & Price -->
+      <div class="cm-field-label" style="margin-top:0">📦 Size &amp; Price</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:4px" id="cm-weights"></div>
+      <div style="font-size:.8rem;color:var(--mu);margin-bottom:14px">Total: <b style="color:var(--p)" id="cm-total">₹0</b></div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-bottom:6px">Flavour</div>
+      <!-- Flavour -->
+      <div class="cm-field-label">🍰 Choose Flavour</div>
       <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px" id="cm-flavours"></div>
 
-      <div id="cm-photo-note" style="display:none;background:#FFF6F3;border-radius:10px;padding:10px 12px;font-size:.78rem;color:var(--mu);margin-bottom:12px;border:1px dashed rgba(255,69,0,.3)">
-        📸 <b>Photo Cake:</b> Send your photo on WhatsApp <b>4 hours before</b> your order time. <a href="https://wa.me/919625867683" target="_blank" style="color:var(--p);font-weight:600">Send photo now →</a>
-      </div>
-
-      <div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-bottom:6px">Quantity</div>
+      <!-- Quantity -->
+      <div class="cm-field-label">🔢 Quantity</div>
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
         <button onclick="cakeQty(-1)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--bd);background:var(--w);font-size:1.1rem;cursor:pointer;color:var(--tx)">−</button>
         <span id="cm-qty" style="font-size:1rem;font-weight:700;min-width:20px;text-align:center;color:var(--tx)">1</span>
         <button onclick="cakeQty(1)" style="width:34px;height:34px;border-radius:50%;border:1.5px solid var(--bd);background:var(--w);font-size:1.1rem;cursor:pointer;color:var(--tx)">+</button>
-        <span style="font-size:.8rem;color:var(--mu)">Total: <b style="color:var(--p)" id="cm-total">₹0</b></span>
       </div>
 
-      <div style="font-size:.82rem;font-weight:700;color:var(--tx);margin-bottom:6px">Special Instructions <span style="font-weight:400;color:var(--mu)">(optional)</span></div>
-      <textarea id="cm-note" style="width:100%;border:1.5px solid var(--bd);border-radius:10px;padding:10px;font-family:var(--fb);font-size:.82rem;color:var(--tx);background:var(--w);resize:none;margin-bottom:16px" rows="2" placeholder="E.g. Write 'Happy Birthday Rahul' on cake..."></textarea>
+      <!-- Divider -->
+      <div style="border-top:1.5px dashed var(--bd);margin:6px 0 14px"></div>
+      <div style="font-size:.78rem;font-weight:700;color:var(--mu);margin-bottom:10px;letter-spacing:.3px">🎉 CAKE PERSONALISATION</div>
 
-      <button onclick="cakeOrderWA()" style="width:100%;padding:14px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border:none;border-radius:50px;font-family:var(--fb);font-size:.92rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px">
-        💬 Order on WhatsApp — <span id="cm-wa-total">₹0</span>
-      </button>
+      <!-- Name on cake -->
+      <div class="cm-field-label" style="margin-top:0">👤 Name on Cake <span style="font-weight:400;color:var(--mu)">(e.g. Rahul, Priya)</span></div>
+      <input id="cm-person-name" class="cm-input" type="text" placeholder="Enter the person's name" autocomplete="off"/>
+
+      <!-- Age -->
+      <div class="cm-field-label">🎂 Age <span style="font-weight:400;color:var(--mu)">(optional — e.g. 7, 25, 50)</span></div>
+      <input id="cm-person-age" class="cm-input" type="text" placeholder="e.g. 5 or 30" inputmode="numeric" autocomplete="off"/>
+
+      <!-- Message on cake -->
+      <div class="cm-field-label">💬 Message on Cake <span style="font-weight:400;color:var(--mu)">(optional)</span></div>
+      <input id="cm-person-msg" class="cm-input" type="text" placeholder="e.g. Happy Birthday! or Congratulations!" autocomplete="off"/>
+
+      <!-- Special instructions -->
+      <div class="cm-field-label">📝 Any Other Instructions <span style="font-weight:400;color:var(--mu)">(optional)</span></div>
+      <textarea id="cm-note" class="cm-input" style="resize:none" rows="2" placeholder="e.g. Less sweet, extra cream on top..."></textarea>
+
+      <!-- Photo cake section -->
+      <div id="cm-photo-note" style="display:none;background:#FFF6F3;border-radius:10px;padding:12px;font-size:.78rem;color:var(--mu);margin-top:14px;border:1px dashed rgba(255,69,0,.3);line-height:1.7">
+        📸 <b style="color:var(--tx)">Photo Cake Instructions:</b><br/>
+        Send your photo on WhatsApp <b>at least 4 hours before</b> your required time. Your photo will be printed on edible paper and placed on the cake — it's completely safe to eat!<br/>
+        <div id="cm-photo-wa-row" style="display:none;margin-top:10px">
+          <button onclick="cakeSendPhotoWA()" class="cm-wa-btn orange" style="font-size:.8rem;padding:10px 16px;border-radius:50px;width:100%">
+            📸 Send My Photo on WhatsApp Now
+          </button>
+        </div>
+      </div>
+
+      <!-- Order button -->
+      <div style="margin-top:18px">
+        <button onclick="cakeOrderWA()" class="cm-wa-btn green" style="width:100%;padding:14px;font-size:.92rem;border-radius:50px">
+          💬 Order on WhatsApp — <span id="cm-wa-total">₹0</span>
+        </button>
+      </div>
+
     </div>
   </div>
 </div>
@@ -1241,34 +1273,42 @@ nav{padding:0 12px;height:56px;gap:8px}
 .cake-fpill{padding:5px 14px;border-radius:50px;border:1.5px solid var(--bd);background:var(--w);cursor:pointer;white-space:nowrap;font-family:var(--fb);font-size:.78rem;font-weight:600;color:var(--mu);transition:var(--tr);flex-shrink:0}
 .cake-fpill.active{background:var(--p);color:#fff;border-color:var(--p)}
 .cake-fpill:hover{border-color:var(--p);color:var(--p)}
-.cake-wpill{padding:5px 13px;border-radius:50px;border:1.5px solid var(--bd);background:var(--w);cursor:pointer;font-family:var(--fb);font-size:.76rem;font-weight:600;color:var(--mu);transition:var(--tr)}
+.cake-wpill{padding:6px 14px;border-radius:50px;border:1.5px solid var(--bd);background:var(--w);cursor:pointer;font-family:var(--fb);font-size:.76rem;font-weight:600;color:var(--mu);transition:var(--tr)}
 .cake-wpill.active{background:var(--p);color:#fff;border-color:var(--p)}
-.cake-flpill{padding:5px 13px;border-radius:50px;border:1.5px solid var(--bd);background:var(--w);cursor:pointer;font-family:var(--fb);font-size:.76rem;font-weight:600;color:var(--mu);transition:var(--tr)}
+.cake-flpill{padding:6px 14px;border-radius:50px;border:1.5px solid var(--bd);background:var(--w);cursor:pointer;font-family:var(--fb);font-size:.76rem;font-weight:600;color:var(--mu);transition:var(--tr)}
 .cake-flpill.active{background:var(--n);color:#fff;border-color:var(--n)}
+.cake-fl-preview{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;margin-bottom:6px}
+.cake-fl-chip{padding:2px 8px;border-radius:20px;font-size:.66rem;font-weight:600;background:#F0F4FF;color:#3730a3;border:1px solid #c7d2fe}
+.cm-field-label{font-size:.82rem;font-weight:700;color:var(--tx);margin-bottom:6px;margin-top:14px}
+.cm-input{width:100%;border:1.5px solid var(--bd);border-radius:10px;padding:10px 12px;font-family:var(--fb);font-size:.82rem;color:var(--tx);background:var(--w);outline:none;transition:border-color .2s}
+.cm-input:focus{border-color:var(--p)}
+.cm-wa-row{display:flex;gap:10px;margin-top:6px}
+.cm-wa-btn{flex:1;padding:13px;border:none;border-radius:50px;font-family:var(--fb);font-size:.88rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:opacity .2s}
+.cm-wa-btn:hover{opacity:.88}
+.cm-wa-btn.green{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff}
+.cm-wa-btn.orange{background:linear-gradient(135deg,var(--p),var(--pd));color:#fff}
 </style>
 
 <script>
 (function(){
 var ALL_FL=['Vanilla','Chocolate','Strawberry','Pineapple','Butterscotch','Black Forest','Orange','Rainbow'];
 var CAKES=[
-  {id:'ck1',name:'Red Velvet Heart',badge:'Bestseller',tags:['budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415626/WhatsApp_Image_2026-04-06_at_12.29.43_AM_1_ah68pm.jpg',weights:[{w:'500gm',p:200}],flavours:['Red Velvet']},
-  {id:'ck2',name:'Rainbow Drip',badge:'',tags:['budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.01_AM_1_xleltf.jpg',weights:[{w:'500gm',p:200}],flavours:['Pineapple','Strawberry','Vanilla']},
-  {id:'ck3',name:'Strawberry Pink',badge:'',tags:['budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415626/WhatsApp_Image_2026-04-06_at_12.29.43_AM_3_latazm.jpg',weights:[{w:'500gm',p:200}],flavours:['Strawberry']},
-  {id:'ck4',name:'Light Chocolate',badge:'',tags:['chocolate','budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.01_AM_nfvxbp.jpg',weights:[{w:'500gm',p:200}],flavours:['Chocolate']},
-  {id:'ck5',name:'Butterfly Birthday',badge:'Elegant',tags:['vanilla'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.01_AM_1_xleltf.jpg',weights:[{w:'1kg',p:350}],flavours:['Vanilla']},
-  {id:'ck6',name:'Doll Face Cake',badge:'',tags:['kids','vanilla'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331699/WhatsApp_Image_2026-04-05_at_1.09.03_AM_1_j20z42.jpg',weights:[{w:'1kg',p:350}],flavours:['Vanilla']},
-  {id:'ck7',name:'Doraemon',badge:'Kids Fav',tags:['kids'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.04_AM_s13hao.jpg',weights:[{w:'400gm',p:200}],flavours:['Vanilla','Chocolate']},
-  {id:'ck8',name:'Kids Car Cake',badge:'',tags:['kids','vanilla'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.02_AM_qcuvm9.jpg',weights:[{w:'1kg',p:420}],flavours:['Vanilla']},
-  {id:'ck9',name:'Fruit Fresh Cake',badge:'Healthy',tags:['fruit'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.02_AM_1_hmiagu.jpg',weights:[{w:'500gm',p:400}],flavours:['Fruit']},
-  {id:'ck10',name:'Loaded Chocolate',badge:'Rich',tags:['chocolate'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.04_AM_2_tyggtz.jpg',weights:[{w:'500gm',p:600}],flavours:['Chocolate']},
-  {id:'ck11',name:'Mini Chocolate',badge:'Budget Pick',tags:['chocolate','budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.01_AM_nfvxbp.jpg',weights:[{w:'350gm',p:150}],flavours:ALL_FL},
-  {id:'ck12',name:'Strawberry Drip',badge:'',tags:['vanilla'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.04_AM_1_kzkwgs.jpg',weights:[{w:'1kg',p:350}],flavours:ALL_FL},
-  {id:'ck13',name:'Photo Cake',badge:'Personalized',tags:['photo','kids'],isPhoto:true,img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.02_AM_2_sjtpby.jpg',weights:[{w:'500gm',p:350},{w:'1kg',p:500}],flavours:ALL_FL},
-  {id:'ck14',name:'Cricket Cake',badge:'Sports',tags:['kids'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.03_AM_2_by8goh.jpg',weights:[{w:'1kg',p:350}],flavours:['Pineapple','Butterscotch','Vanilla','Strawberry']},
-  {id:'ck15',name:'Cartoon Tiered',badge:'Grand',tags:['tiered','kids'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.03_AM_y1xymt.jpg',weights:[{w:'2kg',p:700},{w:'3kg',p:1050},{w:'4kg',p:1400},{w:'5kg',p:1750}],flavours:ALL_FL},
-  {id:'ck16',name:'Rose Tiered',badge:'Wedding',tags:['tiered'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.05_AM_vaar0s.jpg',weights:[{w:'2kg',p:700},{w:'3kg',p:1050},{w:'4kg',p:1400},{w:'5kg',p:1750}],flavours:['Pineapple','Vanilla','Butterscotch']},
-  {id:'ck17',name:'Sprinkle Drip',badge:'',tags:['vanilla'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415626/WhatsApp_Image_2026-04-06_at_12.29.43_AM_3_latazm.jpg',weights:[{w:'1kg',p:350}],flavours:ALL_FL},
-  {id:'ck18',name:'Custom Order',badge:'Any Design',tags:['tiered','kids','photo'],isPhoto:true,img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415628/WhatsApp_Image_2026-04-06_at_12.29.43_AM_q1f9zf.jpg',weights:[{w:'1kg',p:350},{w:'2kg',p:700},{w:'3kg',p:1050}],flavours:ALL_FL}
+  {id:'ck1', name:'Red Velvet Heart',  badge:'Bestseller', tags:['budget'],            img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415626/WhatsApp_Image_2026-04-06_at_12.29.43_AM_1_ah68pm.jpg', weights:[{w:'500gm',p:200}],                                   flavours:['Red Velvet']},
+  {id:'ck3', name:'Strawberry Pink',   badge:'',           tags:['budget'],            img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415626/WhatsApp_Image_2026-04-06_at_12.29.43_AM_3_latazm.jpg',  weights:[{w:'500gm',p:200}],                                   flavours:ALL_FL},
+  {id:'ck4', name:'Light Chocolate',   badge:'',           tags:['chocolate','budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.01_AM_nfvxbp.jpg',     weights:[{w:'500gm',p:200}],                                   flavours:ALL_FL},
+  {id:'ck5', name:'Butterfly Birthday',badge:'Elegant',    tags:['vanilla'],           img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.01_AM_1_xleltf.jpg',   weights:[{w:'1kg',p:350}],                                     flavours:ALL_FL},
+  {id:'ck6', name:'Doll Face Cake',    badge:'',           tags:['kids','vanilla'],    img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331699/WhatsApp_Image_2026-04-05_at_1.09.03_AM_1_j20z42.jpg',   weights:[{w:'1kg',p:350}],                                     flavours:ALL_FL},
+  {id:'ck7', name:'Doraemon',          badge:'Kids Fav',   tags:['kids'],              img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.04_AM_s13hao.jpg',     weights:[{w:'400gm',p:200}],                                   flavours:['Vanilla','Chocolate']},
+  {id:'ck8', name:'Kids Car Cake',     badge:'',           tags:['kids','vanilla'],    img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.02_AM_qcuvm9.jpg',     weights:[{w:'1kg',p:420}],                                     flavours:ALL_FL},
+  {id:'ck9', name:'Fruit Fresh Cake',  badge:'Healthy',    tags:['fruit'],             img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.02_AM_1_hmiagu.jpg',   weights:[{w:'500gm',p:400}],                                   flavours:ALL_FL},
+  {id:'ck10',name:'Loaded Chocolate',  badge:'Rich',       tags:['chocolate'],         img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.04_AM_2_tyggtz.jpg',   weights:[{w:'500gm',p:600}],                                   flavours:ALL_FL},
+  {id:'ck11',name:'Mini Chocolate',    badge:'Budget Pick', tags:['chocolate','budget'],img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775419676/WhatsApp_Image_2026-04-06_at_1.37.16_AM_qsvpez.jpg',  weights:[{w:'350gm',p:150}],                                   flavours:ALL_FL},
+  {id:'ck12',name:'Strawberry Drip',   badge:'',           tags:['vanilla'],           img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415628/WhatsApp_Image_2026-04-06_at_12.29.43_AM_q1f9zf.jpg',    weights:[{w:'1kg',p:350}],                                     flavours:ALL_FL},
+  {id:'ck13',name:'Photo Cake',        badge:'Personalized',tags:['photo','kids'],     img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331697/WhatsApp_Image_2026-04-05_at_1.09.02_AM_2_sjtpby.jpg',   weights:[{w:'500gm',p:350},{w:'1kg',p:500}],                   flavours:ALL_FL, isPhoto:true},
+  {id:'ck14',name:'Cricket Cake',      badge:'Sports',     tags:['kids'],              img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.03_AM_2_by8goh.jpg',   weights:[{w:'1kg',p:350}],                                     flavours:['Pineapple','Butterscotch','Vanilla','Strawberry']},
+  {id:'ck15',name:'Cartoon Tiered',    badge:'Grand',      tags:['tiered','kids'],     img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.03_AM_y1xymt.jpg',     weights:[{w:'2kg',p:700},{w:'3kg',p:1050},{w:'4kg',p:1400},{w:'5kg',p:1750}], flavours:ALL_FL},
+  {id:'ck16',name:'Rose Tiered',       badge:'Wedding',    tags:['tiered'],            img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775331698/WhatsApp_Image_2026-04-05_at_1.09.05_AM_vaar0s.jpg',     weights:[{w:'2kg',p:700},{w:'3kg',p:1050},{w:'4kg',p:1400},{w:'5kg',p:1750}], flavours:['Pineapple','Vanilla','Butterscotch']},
+  {id:'ck17',name:'Sprinkle Drip',     badge:'',           tags:['vanilla'],           img:'https://res.cloudinary.com/dklefbj2a/image/upload/v1775415626/WhatsApp_Image_2026-04-06_at_12.29.43_AM_2_ut00xy.jpg',  weights:[{w:'1kg',p:350}],                                     flavours:ALL_FL}
 ];
 
 var _cakeFilter='all';
@@ -1288,7 +1328,14 @@ function renderCakeGrid(){
   });
   var html=list.map(function(c){
     var minP=c.weights[0].p;
-    var flLabel=c.flavours.length>3?'Any flavour':c.flavours.slice(0,2).join(', ');
+    // Flavour chips shown on card (max 4, then "+N more")
+    var flChips='';
+    if(c.flavours.length<=5){
+      flChips=c.flavours.map(function(f){return'<span class="cake-fl-chip">'+f+'</span>';}).join('');
+    } else {
+      flChips=c.flavours.slice(0,4).map(function(f){return'<span class="cake-fl-chip">'+f+'</span>';}).join('')+
+        '<span class="cake-fl-chip" style="background:#fef3c7;color:#92400e;border-color:#fcd34d">+'+( c.flavours.length-4)+' more</span>';
+    }
     return'<div class="mcard" style="cursor:pointer" onclick="openCakeModal(\''+c.id+'\')">'+
       '<div class="cewrap">'+
       (c.badge?'<span class="badge badge-bs">'+c.badge+'</span>':'')+
@@ -1297,10 +1344,10 @@ function renderCakeGrid(){
       '</div>'+
       '<div class="cbody">'+
       '<div class="cname">'+c.name+'</div>'+
-      '<div class="cdesc">'+flLabel+'</div>'+
+      '<div class="cake-fl-preview">'+flChips+'</div>'+
       '<div class="cbottom">'+
       '<div class="cprice">₹'+minP+'<span style="font-size:.68rem;font-weight:400;color:var(--mu)"> / '+c.weights[0].w+'</span></div>'+
-      '<button class="addbtn" onclick="event.stopPropagation();openCakeModal(\''+c.id+'\')">Order</button>'+
+      '<button class="addbtn" onclick="event.stopPropagation();openCakeModal(\''+c.id+'\')">+ Add</button>'+
       '</div></div></div>';
   }).join('');
   document.getElementById('cakeGrid').innerHTML=html||'<div style="text-align:center;padding:40px;color:var(--mu)">No cakes in this category</div>';
@@ -1317,13 +1364,20 @@ window.openCakeModal=function(id){
   var badge=document.getElementById('cm-badge');
   if(_cmCake.badge){badge.style.display='block';badge.innerHTML='<span class="badge badge-bs" style="position:static;display:inline-block">'+_cmCake.badge+'</span>';}
   else{badge.style.display='none';}
-  document.getElementById('cm-flavour-default').textContent=_cmCake.flavours.length>3?'Available in any flavour':'Flavour: '+_cmCake.flavours.join(', ');
+  // Photo section
   document.getElementById('cm-photo-note').style.display=_cmCake.isPhoto?'block':'none';
-  document.getElementById('cm-qty').textContent=1;
+  document.getElementById('cm-photo-wa-row').style.display=_cmCake.isPhoto?'flex':'none';
+  // Reset personal detail fields
+  document.getElementById('cm-person-name').value='';
+  document.getElementById('cm-person-age').value='';
+  document.getElementById('cm-person-msg').value='';
   document.getElementById('cm-note').value='';
+  document.getElementById('cm-qty').textContent=1;
   renderCmWeights();
   renderCmFlavours();
   updateCmTotal();
+  // Pre-fill name from profile if available
+  try{var u=JSON.parse(localStorage.getItem('bm_user')||'{}');if(u.name&&u.name!=='Guest User')document.getElementById('cm-person-name').value=u.name;}catch(e){}
   document.getElementById('cakeModal').classList.add('on');
   document.body.style.overflow='hidden';
 };
@@ -1364,16 +1418,43 @@ window.closeCakeModal=function(){
   document.getElementById('cakeModal').classList.remove('on');
   document.body.style.overflow='';
 };
-window.cakeOrderWA=function(){
-  var note=(document.getElementById('cm-note').value||'').trim();
-  var msg='Hello! I want to order a cake from BudgetMein:\n\n';
+
+// Send photo via WhatsApp before ordering
+window.cakeSendPhotoWA=function(){
+  var pname=(document.getElementById('cm-person-name').value||'').trim();
+  var msg='Hi! I want to order a *Photo Cake* from BudgetMein.\n\n';
   msg+='🎂 *'+_cmCake.name+'*\n';
-  msg+='   Size: '+_cmWeight.w+'\n';
-  msg+='   Flavour: '+_cmFlavour+'\n';
-  msg+='   Quantity: '+_cmQty+'\n';
-  msg+='   Price: ₹'+(_cmWeight.p*_cmQty)+'\n';
-  if(note)msg+='\n📝 Note: '+note+'\n';
-  if(_cmCake.isPhoto)msg+='\n📸 I will send my photo separately on WhatsApp.\n';
+  msg+='👤 Name on cake: '+(pname||'(will confirm)')+'\n\n';
+  msg+='📸 I am sending my photo along with this message.\n';
+  msg+='Please confirm availability and delivery time. Thank you!';
+  window.open('https://wa.me/919625867683?text='+encodeURIComponent(msg),'_blank');
+};
+
+window.cakeOrderWA=function(){
+  var pname=(document.getElementById('cm-person-name').value||'').trim();
+  var page=(document.getElementById('cm-person-age').value||'').trim();
+  var pmsg=(document.getElementById('cm-person-msg').value||'').trim();
+  var note=(document.getElementById('cm-note').value||'').trim();
+  // Build WhatsApp message
+  var msg='Hello! I want to order a cake from *BudgetMein* 🎂\n\n';
+  msg+='━━━━━━━━━━━━━━━━━\n';
+  msg+='🎂 *'+_cmCake.name+'*\n';
+  msg+='📦 Size: *'+_cmWeight.w+'*\n';
+  msg+='🍰 Flavour: *'+_cmFlavour+'*\n';
+  msg+='🔢 Quantity: *'+_cmQty+'*\n';
+  msg+='💰 Total: *₹'+(_cmWeight.p*_cmQty)+'*\n';
+  msg+='━━━━━━━━━━━━━━━━━\n';
+  if(pname) msg+='👤 Name on cake: *'+pname+'*\n';
+  if(page)  msg+='🎂 Age: *'+page+'*\n';
+  if(pmsg)  msg+='💬 Message on cake: *'+pmsg+'*\n';
+  if(note)  msg+='\n📝 Special note: '+note+'\n';
+  if(_cmCake.isPhoto) msg+='\n📸 *Photo Cake* — I will send my photo on WhatsApp separately (4 hrs before delivery).\n';
+  // Add user info if available
+  try{
+    var u=JSON.parse(localStorage.getItem('bm_user')||'{}');
+    if(u.name&&u.name!=='Guest User') msg+='\n👤 Customer: '+u.name;
+    if(u.phone) msg+='\n📱 Phone: '+u.phone;
+  }catch(e){}
   window.open('https://wa.me/919625867683?text='+encodeURIComponent(msg),'_blank');
 };
 
@@ -1384,28 +1465,23 @@ window.fcat=function(el,cat){
   if(typeof _origFcat==='function')_origFcat(el,cat);
 };
 window.fcatCake=function(el){
-  // Hide all food sections, show cake section
   document.querySelectorAll('#msec .section').forEach(function(s){s.style.display='none';});
   document.getElementById('s-cakes').style.display='block';
   document.querySelectorAll('.cpill').forEach(function(b){b.classList.remove('active');});
   el.classList.add('active');
-  // Hide no-results block
   var nr=document.getElementById('nr');if(nr)nr.style.display='none';
   renderCakeGrid();
 };
 
 // Make cakes searchable
-var _origSrch=document.getElementById('srch').oninput;
 document.getElementById('srch').addEventListener('input',function(){
   var q=this.value.toLowerCase().trim();
   if(!q)return;
-  // If currently on cake view, search cakes too
   if(document.getElementById('s-cakes').style.display!=='none'){
     var any=false;
     document.querySelectorAll('#cakeGrid .mcard').forEach(function(card){
       var nm=(card.querySelector('.cname')||{textContent:''}).textContent.toLowerCase();
-      var ds=(card.querySelector('.cdesc')||{textContent:''}).textContent.toLowerCase();
-      var m=nm.includes(q)||ds.includes(q);
+      var m=nm.includes(q);
       card.style.display=m?'':'none';
       if(m)any=true;
     });
