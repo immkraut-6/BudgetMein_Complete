@@ -379,9 +379,18 @@ onAuthStateChanged(auth, async function(user){
 
   // Preload first-order status (controls free delivery display in cart)
   preloadFirstOrderStatus(user.uid);
-  // Show shop picker
+
+  // ================================================================
+  // RESTORE LAST SHOP — if user was inside a shop before refresh,
+  // go back there instead of always showing the shop picker
+  // ================================================================
   setTimeout(function(){
-    if(typeof showShopPicker==='function') showShopPicker();
+    var lastShop = sessionStorage.getItem('bm_active_shop');
+    if(lastShop === 'fastfood' || lastShop === 'cake'){
+      if(typeof enterShop === 'function') enterShop(lastShop);
+    } else {
+      if(typeof showShopPicker === 'function') showShopPicker();
+    }
   }, 200);
 
   // ✅ FIX: Show address popup only AFTER Firestore profile has loaded
@@ -1440,7 +1449,7 @@ window.setCakeFilter=function(f,el){
   renderCakeGrid();
 };
 
-function renderCakeGrid(){
+window.renderCakeGrid=function renderCakeGrid(){
   var grid=document.getElementById('cakeGrid');
   if(!grid)return;
   var list=CAKES.filter(function(c){
@@ -1540,7 +1549,7 @@ window.closeCakeModal=function(){
   document.getElementById('cakeModal').classList.remove('on');
   document.body.style.overflow='';
 };
-function updateCakeModalOrderBtn(){
+window.updateCakeModalOrderBtn=function updateCakeModalOrderBtn(){
   var btn=document.getElementById('cakeAddCartBtn');
   var note=document.getElementById('cakeClosedNote');
   var photoBtn=document.querySelector('#cm-photo-wa-row button');
@@ -4826,6 +4835,7 @@ function updateShopStatusBadges(){
 }
 function showShopPicker(){
   activeShop=null;
+  sessionStorage.removeItem('bm_active_shop'); // clear saved shop on back
   var els={shopPicker:'block',ffShopView:'none',cakeShopView:'none',msec:'none',nr:'none'};
   Object.keys(els).forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=els[id];});
   // Hide search bar on shop picker landing page
@@ -4835,6 +4845,7 @@ function showShopPicker(){
 }
 function enterShop(shop){
   activeShop=shop;
+  sessionStorage.setItem('bm_active_shop', shop); // remember shop across refresh
   var sp=document.getElementById('shopPicker');
   if(sp)sp.style.display='none';
   // Show search bar when inside a shop
