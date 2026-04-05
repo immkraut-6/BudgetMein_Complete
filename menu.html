@@ -742,7 +742,8 @@ nav{position:sticky;top:36px;z-index:1150;background:var(--n);display:flex;align
 .stitle{font-family:var(--fl);font-size:1.5rem;font-weight:700;color:var(--tx);margin-bottom:20px;display:flex;align-items:center;gap:10px}
 .stitle::after{content:'';flex:1;height:2px;background:linear-gradient(90deg,var(--p),transparent);border-radius:2px}
 .mgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:16px}
-.mcard{background:var(--w);border-radius:15px;overflow:hidden;box-shadow:0 3px 16px rgba(0,0,0,.08);display:flex;flex-direction:column;transition:var(--tr);position:relative;border:1.5px solid transparent}
+.mcard{background:var(--w);border-radius:15px;overflow:visible;box-shadow:0 3px 16px rgba(0,0,0,.08);display:flex;flex-direction:column;transition:var(--tr);position:relative;border:1.5px solid transparent}
+.mcard>.cewrap{border-radius:13px 13px 0 0;overflow:hidden}
 .mcard:hover{transform:translateY(-4px);box-shadow:0 10px 30px rgba(0,0,0,.14);border-color:rgba(255,69,0,.12)}
 .cewrap{background:linear-gradient(135deg,#FFF6F3,#FFF0EA);padding:0;text-align:center;font-size:3.4rem;line-height:1;position:relative;height:160px;overflow:hidden}
 .cewrap img{width:100%;height:100%;object-fit:cover;display:block;transition:transform .4s ease}
@@ -755,10 +756,10 @@ nav{position:sticky;top:36px;z-index:1150;background:var(--n);display:flex;align
 .badge-bs{background:#FF4500;color:#fff}
 .badge-sp{background:#C0392B;color:#fff}
 .badge-ml{background:#FFD700;color:#1A1A2E}
-.cbody{padding:12px 13px 14px;flex:1;display:flex;flex-direction:column}
+.cbody{padding:12px 13px 14px;flex:1;display:flex;flex-direction:column;overflow:visible}
 .cname{font-size:.92rem;font-weight:700;color:var(--tx);margin-bottom:3px}
 .cdesc{font-size:.73rem;color:var(--mu);margin-bottom:8px;line-height:1.4}
-.sizesel,.qtysel{display:flex;gap:5px;margin-bottom:8px}
+.sizesel,.qtysel{display:flex;gap:5px;margin-bottom:8px;flex-wrap:wrap}
 .spill,.qpill{padding:3px 12px;border-radius:20px;border:1.5px solid var(--bd);font-size:.72rem;font-weight:600;cursor:pointer;color:var(--mu);background:var(--w);transition:var(--tr)}
 .spill.active,.qpill.active{background:var(--p);color:#fff;border-color:var(--p)}
 /* Extras accordion */
@@ -2175,7 +2176,7 @@ function card(it,cat){
 <div class="cbody"><div class="cname">${it.n}</div><div class="cdesc">${it.d}</div>
 ${sizeHTML}${extrasHTML(it.id,cat)}
 <div class="cbottom"><div class="cprice">₹<span id="pr-${it.id}">${basePrice}</span></div>
-<button class="addbtn" id="btn-${it.id}" onclick="addCart('${it.id}','${cat}')" ${isOpen?'':' disabled'}>+ Add</button>
+<button class="addbtn" id="btn-${it.id}" onclick="addCart('${it.id}','${cat}')" ${(isOpen||DEV_ALWAYS_OPEN)?'':' disabled'}>+ Add</button>
 </div></div></div>`;
 }
 
@@ -2250,7 +2251,7 @@ function selQty(el,id){
 
 // ---- CART ----
 function addCart(id,cat){
-  if(!isOpen)return;
+  if(!isOpen&&!DEV_ALWAYS_OPEN)return;
   const items=MENU[cat],it=items.find(x=>x.id===id);
   const v=getVariant(id,cat);
   const bp=basePrice(it,cat,v);
@@ -4834,11 +4835,11 @@ function enterShop(shop){
     if(msec)msec.style.display='none';
     var cakeNotice=document.getElementById('cakeClosedNoticeBar');
     if(cakeNotice)cakeNotice.style.display=(CAKE_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)||(!isCakeOpen&&!DEV_ALWAYS_OPEN)?'flex':'none';
-    // Set kids filter active
-    _cakeFilter='kids';
+    // Set 'All' filter active so all products show on entry
+    _cakeFilter='all';
     document.querySelectorAll('.cake-fpill').forEach(function(b){b.classList.remove('active');});
-    var kidsPill=document.querySelector('.cake-fpill[onclick*="kids"]');
-    if(kidsPill)kidsPill.classList.add('active');
+    var allPill=document.querySelector('.cake-fpill[onclick*="\'all\'"]');
+    if(allPill)allPill.classList.add('active');
     // Render immediately AND again after paint to guarantee products show
     if(typeof renderCakeGrid==='function')renderCakeGrid();
     if(typeof updateCakeModalOrderBtn==='function')updateCakeModalOrderBtn();
