@@ -1385,7 +1385,7 @@ nav{padding:0 12px;height:56px;gap:8px}
 
       <!-- Add to Cart button (same as fast food) -->
       <div style="margin-top:18px">
-        <button id="cakeAddCartBtn" onclick="addCakeToCart()" style="width:100%;padding:14px;font-size:.92rem;border-radius:50px;border:none;cursor:pointer;font-family:var(--fb);font-weight:700;background:linear-gradient(135deg,var(--p),var(--pd));color:#fff;box-shadow:0 6px 18px rgba(255,69,0,.3);transition:opacity .2s">
+        <button id="cakeAddCartBtn" onclick="addCakeToCart()" style="width:100%;padding:14px;font-size:.92rem;border-radius:50px;border:none;cursor:pointer;font-family:var(--fb);font-weight:700;background:linear-gradient(135deg,#FF4500,#CC3700);color:#fff;box-shadow:0 6px 18px rgba(255,69,0,.35);transition:background .3s ease,transform .15s ease;outline:none;">
           🛒 Add to Cart — <span id="cm-wa-total">₹0</span>
         </button>
         <div id="cakeClosedNote" style="display:none;margin-top:8px;background:#FFF3F3;border-radius:8px;padding:8px 12px;font-size:.75rem;color:var(--er);font-weight:700;text-align:center">
@@ -1415,6 +1415,13 @@ nav{padding:0 12px;height:56px;gap:8px}
 .cm-wa-btn:hover{opacity:.88}
 .cm-wa-btn.green{background:linear-gradient(135deg,#16a34a,#15803d);color:#fff}
 .cm-wa-btn.orange{background:linear-gradient(135deg,var(--p),var(--pd));color:#fff}
+/* Cake modal Add to Cart button — always orange, smooth transition */
+#cakeAddCartBtn{
+  background:linear-gradient(135deg,#FF4500,#CC3700)!important;
+  transition:background 0.3s ease,transform 0.15s ease,opacity 0.2s ease!important;
+}
+#cakeAddCartBtn:not([disabled]):hover{transform:scale(1.02);opacity:.92}
+#cakeAddCartBtn[disabled]{background:linear-gradient(135deg,#ccc,#aaa)!important;cursor:not-allowed!important;opacity:0.5!important;}
 </style>
 
 <script>
@@ -1477,7 +1484,7 @@ window.renderCakeGrid=function renderCakeGrid(){
       '<div class="cake-fl-preview">'+flChips+'</div>'+
       '<div class="cbottom">'+
       '<div class="cprice">₹'+minP+'<span style="font-size:.68rem;font-weight:400;color:var(--mu)"> / '+c.weights[0].w+'</span></div>'+
-      '<button class="addbtn" '+((!isCakeOpen&&!DEV_ALWAYS_OPEN)?'disabled':'')+' onclick="event.stopPropagation();openCakeModal(\''+c.id+'\')">+ Add</button>'+
+      '<button class="addbtn" onclick="event.stopPropagation();openCakeModal(\''+c.id+'\')">+ Add</button>'+
       '</div></div></div>';
   }).join('');
   grid.innerHTML=html||'<div style="text-align:center;padding:40px;color:var(--mu)">No cakes in this category</div>';
@@ -1553,8 +1560,15 @@ window.updateCakeModalOrderBtn=function updateCakeModalOrderBtn(){
   var btn=document.getElementById('cakeAddCartBtn');
   var note=document.getElementById('cakeClosedNote');
   var photoBtn=document.querySelector('#cm-photo-wa-row button');
-  var open=isCakeOpen||DEV_ALWAYS_OPEN;
-  if(btn){btn.disabled=!open;btn.style.opacity=open?'1':'0.45';btn.style.cursor=open?'pointer':'not-allowed';}
+  // DEV_ALWAYS_OPEN overrides everything — if true, shop is ALWAYS open
+  var open=(typeof DEV_ALWAYS_OPEN!=='undefined'&&DEV_ALWAYS_OPEN)||(typeof isCakeOpen!=='undefined'&&isCakeOpen);
+  if(btn){
+    btn.disabled=!open;
+    btn.style.opacity=open?'1':'0.45';
+    btn.style.cursor=open?'pointer':'not-allowed';
+    // Always restore orange color (never leave green flash color stuck)
+    if(open) btn.style.background='linear-gradient(135deg,#FF4500,#CC3700)';
+  }
   if(note){note.style.display=open?'none':'block';}
   if(photoBtn){photoBtn.disabled=!open;photoBtn.style.opacity=open?'1':'0.45';photoBtn.style.cursor=open?'pointer':'not-allowed';}
 }
@@ -1577,12 +1591,29 @@ window.addCakeToCart=function(){
   var key='cake-'+_cmCake.id+'-'+_cmWeight.w.replace(/\s/g,'')+'-'+_cmFlavour.replace(/\s/g,'');
   if(cart[key]) cart[key].qty+=_cmQty;
   else cart[key]={n:_cmCake.name,e:'🎂',p:_cmWeight.p,qty:_cmQty,meta:meta,isCake:true,isPhoto:!!_cmCake.isPhoto};
-  // Flash button
-  var btn=document.getElementById('cakeAddCartBtn');
-  if(btn){var orig=btn.innerHTML;btn.textContent='✅ Added to Cart!';btn.style.background='var(--ok)';setTimeout(function(){btn.innerHTML=orig;btn.style.background='';},1000);}
   renderCart();
-  // Auto-close modal after adding
-  setTimeout(function(){closeCakeModal();},900);
+  // Flash green → close modal → reset to orange (no disabled, no race condition)
+  var btn=document.getElementById('cakeAddCartBtn');
+  if(btn){
+    btn.innerHTML='✅ Added to Cart!';
+    btn.style.background='linear-gradient(135deg,#22c55e,#16a34a)';
+    btn.style.transform='scale(0.97)';
+    btn.disabled=false;
+    btn.style.opacity='1';
+  }
+  setTimeout(function(){
+    closeCakeModal();
+    // Reset button to orange for next open
+    var b2=document.getElementById('cakeAddCartBtn');
+    if(b2){
+      b2.innerHTML='🛒 Add to Cart — <span id="cm-wa-total">₹0</span>';
+      b2.style.background='linear-gradient(135deg,#FF4500,#CC3700)';
+      b2.style.transform='';
+      b2.disabled=false;
+      b2.style.opacity='1';
+      b2.style.cursor='pointer';
+    }
+  },750);
 };
 
 // Send photo via WhatsApp before ordering
@@ -2142,12 +2173,24 @@ function checkStore(){
     }
   }
   if(activeShop==='fastfood'){
-    document.querySelectorAll('#msec .addbtn').forEach(function(btn){btn.disabled=!isOpen&&!DEV_ALWAYS_OPEN;});
+    var _ffEnabled = isOpen||DEV_ALWAYS_OPEN;
+    document.querySelectorAll('#msec .addbtn').forEach(function(btn){
+      btn.disabled=!_ffEnabled;
+      btn.style.opacity=_ffEnabled?'1':'0.5';
+    });
   }
   if(activeShop==='cake'){
-    document.querySelectorAll('#cakeGrid .addbtn').forEach(function(btn){btn.disabled=!isCakeOpen&&!DEV_ALWAYS_OPEN;});
+    var _cakeEnabled = isCakeOpen||DEV_ALWAYS_OPEN;
+    document.querySelectorAll('#cakeGrid .addbtn').forEach(function(btn){
+      btn.disabled=!_cakeEnabled;
+      btn.style.opacity=_cakeEnabled?'1':'0.5';
+    });
     var addCartBtn=document.getElementById('cakeAddCartBtn');
-    if(addCartBtn){addCartBtn.disabled=!isCakeOpen&&!DEV_ALWAYS_OPEN;addCartBtn.style.opacity=(isCakeOpen||DEV_ALWAYS_OPEN)?'1':'0.45';}
+    if(addCartBtn){
+      addCartBtn.disabled=!_cakeEnabled;
+      addCartBtn.style.opacity=_cakeEnabled?'1':'0.45';
+      addCartBtn.style.cursor=_cakeEnabled?'pointer':'not-allowed';
+    }
   }
 
   refreshOrderBtn();
