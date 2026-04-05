@@ -508,12 +508,15 @@ window.bmSaveOrder=async function(orderData){
 window.bmOrderTG=async function(order,items,sub,del,plat){
   const u=JSON.parse(localStorage.getItem('bm_user')||'{}');
   const t=new Date().toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
+  var hasCake=items.some(function(i){return i.isCake;});
+  var hasFf=items.some(function(i){return !i.isCake;});
+  var shopLabel=hasCake&&!hasFf?'🎂 CAKE ORDER':hasFf&&!hasCake?'🍕 FAST FOOD ORDER':'🍕🎂 MIXED ORDER';
   const lines=items.map(function(i,idx){
     return(idx+1)+'. '+(i.n||i.name)+(i.meta?' ('+i.meta+')':'')+' x'+(i.qty||i.quantity)+'  —  <b>₹'+((i.p||i.price)*(i.qty||i.quantity))+'</b>';
   }).join('\n');
   const total=sub+del+(plat||order.platformFee||5);
   await tg('order',
-    '🆕 <b>NEW ORDER RECEIVED</b>\n'+
+    '🆕 <b>NEW ORDER — '+shopLabel+'</b>\n'+
     '══════════════\n'+
     '👤 <b>Name:</b> '+(u.name||order.name||'Guest')+'\n'+
     '📞 <b>Phone:</b> '+(u.phone||order.phone||'N/A')+'\n'+
@@ -708,6 +711,7 @@ nav{position:sticky;top:36px;z-index:1150;background:var(--n);display:flex;align
 .nicon{width:38px;height:38px;border-radius:9px;background:transparent;display:flex;align-items:center;justify-content:center;overflow:hidden;flex-shrink:0}.nicon img{width:38px;height:38px;object-fit:cover;border-radius:9px;display:block}
 .nname{font-family:var(--fl);font-size:1.25rem;font-weight:800;color:#fff}.nname span{color:var(--g)}
 .nsearch{flex:1;display:flex;align-items:center;background:rgba(255,255,255,.1);border:1.5px solid rgba(255,255,255,.15);border-radius:50px;overflow:hidden;transition:var(--tr);position:relative}
+.search-hidden .nsearch{display:none!important}
 .nsearch:focus-within{border-color:var(--p);background:rgba(255,255,255,.15)}
 .nsearch input{flex:1;background:transparent;border:none;outline:none;padding:9px 14px;font-family:var(--fb);font-size:.83rem;color:#fff}
 .nsearch input::placeholder{color:rgba(255,255,255,.45)}
@@ -1150,17 +1154,34 @@ nav{padding:0 12px;height:56px;gap:8px}
 
 <div id="banner" role="alert"></div>
 <nav>
-  <a href="#" class="nlogo" id="navLogo"><div class="nicon"><img src="https://res.cloudinary.com/dklefbj2a/image/upload/v1774639854/BudgetMein_icon_-_Copy-removebg-preview_kjmrap.png" alt="BudgetMein" /></div><div class="nname">Budget<span>Mein</span></div></a>
+  <a href="#" class="nlogo" id="navLogo" onclick="event.preventDefault();showShopPicker()"><div class="nicon"><img src="https://res.cloudinary.com/dklefbj2a/image/upload/v1774639854/BudgetMein_icon_-_Copy-removebg-preview_kjmrap.png" alt="BudgetMein" /></div><div class="nname">Budget<span>Mein</span></div></a>
   <div class="nsearch"><span style="padding:0 10px;color:rgba(255,255,255,.4)">🔍</span><input id="srch" type="search" placeholder="Search pizza, burger..." autocomplete="off"/><button id="clearBtn" onclick="clearSearch()">✕</button></div>
   <button class="ncart" onclick="openProfile()" aria-label="Profile" style="font-size:1.25rem">👤</button>
   <button class="ncart" onclick="openCart()" aria-label="Cart">🛒<span class="cbadge" id="nbadge">0</span></button>
 </nav>
 <!-- SHOP PICKER -->
-<div id="shopPicker" style="display:none;padding:20px 5% 32px;background:var(--bg)">
-  <div style="text-align:center;margin-bottom:22px">
-    <h2 style="font-family:var(--fl);font-size:1.45rem;font-weight:800;color:var(--n)">What are you craving? &#x1F60B;</h2>
-    <p style="font-size:.8rem;color:var(--mu);margin-top:4px">Both shops at K Block, Jahangir Puri, Delhi 110033</p>
+<div id="shopPicker" style="display:none;background:var(--bg)">
+  <!-- Hero welcome banner -->
+  <div style="background:linear-gradient(135deg,#1A1A2E 0%,#2C1A40 55%,#3D1200 100%);padding:32px 5% 28px;text-align:center;position:relative;overflow:hidden">
+    <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 60% 40%,rgba(255,69,0,.18),transparent 65%)"></div>
+    <div style="position:relative;z-index:1">
+      <div style="font-size:2rem;margin-bottom:8px">🍕🎂</div>
+      <h2 style="font-family:var(--fl);font-size:1.7rem;font-weight:800;color:#fff;margin-bottom:6px;line-height:1.2">
+        Ghar Baitha Order Kar,<br/><span style="color:#FFD700">Budget Mein Kha!</span>
+      </h2>
+      <p style="font-size:.82rem;color:rgba(255,255,255,.65);margin-bottom:16px;line-height:1.6">
+        Fresh food & custom cakes — delivered to your door in Jahangir Puri, Delhi
+      </p>
+      <div style="display:flex;flex-wrap:wrap;gap:8px;justify-content:center">
+        <span style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:4px 12px;border-radius:50px;font-size:.72rem;font-weight:600">⚡ Fast Delivery</span>
+        <span style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:4px 12px;border-radius:50px;font-size:.72rem;font-weight:600">💵 Cash on Delivery</span>
+        <span style="background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.2);color:rgba(255,255,255,.85);padding:4px 12px;border-radius:50px;font-size:.72rem;font-weight:600">🎉 Free Delivery on 1st Order</span>
+      </div>
+    </div>
   </div>
+  <!-- Shop cards -->
+  <div style="padding:20px 5% 32px">
+  <p style="text-align:center;font-size:.8rem;color:var(--mu);margin-bottom:16px;font-weight:600;letter-spacing:.3px;text-transform:uppercase">Choose Your Shop</p>
   <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;max-width:480px;margin:0 auto">
     <!-- FAST FOOD CARD -->
     <div id="ffCard" onclick="enterShop('fastfood')" style="cursor:pointer;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.10);border:2px solid transparent;transition:all .25s">
@@ -1189,6 +1210,7 @@ nav{padding:0 12px;height:56px;gap:8px}
       </div>
     </div>
   </div>
+  </div>
 </div>
 
 <!-- FAST FOOD VIEW -->
@@ -1205,10 +1227,12 @@ nav{padding:0 12px;height:56px;gap:8px}
     </div>
     <div class="hemoji">&#x1F355;<br/>&#x1F354; &#x1F32F;<br/>&#x1F35F; &#x1F96A;</div>
   </section>
-  <div id="ffClosedNotice" style="display:none;margin:0 5% 4px;background:#FFF3F3;border-left:4px solid var(--er);border-radius:10px;padding:12px 16px">
-    <div style="font-family:var(--fl);font-size:.98rem;font-weight:800;color:var(--er)">&#x1F534; Fry Day is Temporarily Closed</div>
-    <div style="font-size:.77rem;color:#7B3B3B;margin-top:4px;line-height:1.6">We are not taking fast food orders right now. You can browse the menu!<br/>&#x1F382; <b>Order Cakes</b> from Shri Ram Ji Bakery &mdash; we are open!</div>
-    <button onclick="goBackToShopPicker()" style="margin-top:8px;padding:6px 16px;background:var(--p);color:#fff;border:none;border-radius:50px;font-family:var(--fb);font-size:.74rem;font-weight:700;cursor:pointer">&#x1F382; Go to Cake Shop</button>
+  <div id="ffClosedNotice" style="display:none;margin:0 5% 4px;background:#FFF3F3;border-left:4px solid var(--er);border-radius:10px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div>
+      <span style="font-family:var(--fl);font-size:.88rem;font-weight:800;color:var(--er)">🔴 Closed</span>
+      <span id="ffClosedOpenTime" style="font-size:.76rem;color:#7B3B3B;margin-left:8px">· Opens at 3:00 PM</span>
+    </div>
+    <button onclick="goBackToShopPicker()" style="padding:5px 12px;background:var(--p);color:#fff;border:none;border-radius:50px;font-family:var(--fb);font-size:.72rem;font-weight:700;cursor:pointer;white-space:nowrap">🎂 Try Cakes</button>
   </div>
   <div class="cats"><div class="cscroll" id="catrow">
     <button class="cpill" onclick="fcat(this,'all')">&#x1F37D;&#xFE0F; All</button>
@@ -1231,10 +1255,16 @@ nav{padding:0 12px;height:56px;gap:8px}
       <h1>Shri Ram Ji <span>Bakery</span> &#x1F382;</h1>
       <p style="font-size:.8rem;color:rgba(255,255,255,.6);margin-bottom:6px">K Block, Jahangir Puri, Delhi 110033</p>
       <p>Custom cakes made fresh &mdash; delivered with love.</p>
-      <div class="hbadges"><span class="hb or">&#x23F0; Order via WhatsApp</span><span class="hb">&#x1F4CD; Jahangir Puri</span><span class="hb">&#x1F382; Custom Cakes</span></div>
+      <div class="hbadges"><span class="hb">📦 Add to Cart &amp; Order</span><span class="hb">&#x1F4CD; Jahangir Puri</span><span class="hb">&#x1F382; Custom Cakes</span></div>
     </div>
     <div class="hemoji">&#x1F382;<br/>&#x1F370; &#x1F381;</div>
   </section>
+  <div id="cakeClosedNoticeBar" style="display:none;margin:0 5% 4px;background:#FFF3F3;border-left:4px solid var(--er);border-radius:10px;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+    <div>
+      <span style="font-family:var(--fl);font-size:.88rem;font-weight:800;color:var(--er)">🔴 Closed</span>
+      <span style="font-size:.76rem;color:#7B3B3B;margin-left:8px">· Opens at 10:00 AM</span>
+    </div>
+  </div>
 </div>
 
 <div id="nr" class="no-results"><span class="nr-emoji">😕</span><p id="nrText">No items found.</p></div>
@@ -1258,7 +1288,7 @@ nav{padding:0 12px;height:56px;gap:8px}
   </div>
   <div class="mgrid" id="cakeGrid"></div>
   <div style="background:linear-gradient(135deg,#FFF6F3,#FFF0EA);border-radius:14px;padding:14px 16px;margin-top:18px;font-size:.8rem;color:var(--mu);line-height:1.7;border:1px dashed rgba(255,69,0,.2)">
-    🎂 <b style="color:var(--tx)">How to order a cake?</b> — Tap any cake, choose size &amp; flavour, then tap <b style="color:var(--p)">Order on WhatsApp</b>. For photo cakes, send your photo <b>4 hours before</b> delivery.
+    🎂 <b style="color:var(--tx)">How to order a cake?</b> — Tap any cake, choose size &amp; flavour, tap <b style="color:var(--p)">Add to Cart</b>, then checkout. For <b>Photo Cakes</b> — after adding to cart, send your photo via WhatsApp <b>4 hours before</b> delivery.
   </div>
 </div>
 
@@ -1316,21 +1346,22 @@ nav{padding:0 12px;height:56px;gap:8px}
 
       <!-- Photo cake section -->
       <div id="cm-photo-note" style="display:none;background:#FFF6F3;border-radius:10px;padding:12px;font-size:.78rem;color:var(--mu);margin-top:14px;border:1px dashed rgba(255,69,0,.3);line-height:1.7">
-        📸 <b style="color:var(--tx)">Photo Cake Instructions:</b><br/>
-        Send your photo on WhatsApp <b>at least 4 hours before</b> your required time. Your photo will be printed on edible paper and placed on the cake — it's completely safe to eat!<br/>
+        📸 <b style="color:var(--tx)">Photo Cake:</b> Send your photo on WhatsApp <b>at least 4 hours before</b> your delivery time. It will be printed on edible paper and placed on the cake.<br/>
         <div id="cm-photo-wa-row" style="display:none;margin-top:10px">
           <button onclick="cakeSendPhotoWA()" class="cm-wa-btn orange" style="font-size:.8rem;padding:10px 16px;border-radius:50px;width:100%">
-            📸 Send My Photo on WhatsApp Now
+            📸 Send My Photo on WhatsApp
           </button>
         </div>
       </div>
 
-      <!-- Order button -->
+      <!-- Add to Cart button (same as fast food) -->
       <div style="margin-top:18px">
-        <button id="cakeWAOrderBtn" onclick="cakeOrderWA()" class="cm-wa-btn green" style="width:100%;padding:14px;font-size:.92rem;border-radius:50px">
-          💬 Order on WhatsApp — <span id="cm-wa-total">₹0</span>
+        <button id="cakeAddCartBtn" onclick="addCakeToCart()" style="width:100%;padding:14px;font-size:.92rem;border-radius:50px;border:none;cursor:pointer;font-family:var(--fb);font-weight:700;background:linear-gradient(135deg,var(--p),var(--pd));color:#fff;box-shadow:0 6px 18px rgba(255,69,0,.3);transition:opacity .2s">
+          🛒 Add to Cart — <span id="cm-wa-total">₹0</span>
         </button>
-        <div id="cakeClosedNote" style="display:none;margin-top:8px;background:#FFF3F3;border-radius:8px;padding:8px 12px;font-size:.75rem;color:var(--er);font-weight:600;text-align:center">⛔ Shri Ram Ji Bakery is currently closed.<br/><span style="font-weight:400;color:#7B3B3B">Orders accepted 10:00 AM – 9:00 PM</span></div>
+        <div id="cakeClosedNote" style="display:none;margin-top:8px;background:#FFF3F3;border-radius:8px;padding:8px 12px;font-size:.75rem;color:var(--er);font-weight:700;text-align:center">
+          🔴 Closed · Opens at 10:00 AM
+        </div>
       </div>
 
     </div>
@@ -1415,7 +1446,7 @@ function renderCakeGrid(){
       '<div class="cake-fl-preview">'+flChips+'</div>'+
       '<div class="cbottom">'+
       '<div class="cprice">₹'+minP+'<span style="font-size:.68rem;font-weight:400;color:var(--mu)"> / '+c.weights[0].w+'</span></div>'+
-      '<button class="addbtn" onclick="event.stopPropagation();openCakeModal(\''+c.id+'\')">+ Add</button>'+
+      '<button class="addbtn" '+((!isCakeOpen&&!DEV_ALWAYS_OPEN)?'disabled':'')+' onclick="event.stopPropagation();openCakeModal(\''+c.id+'\')">+ Add</button>'+
       '</div></div></div>';
   }).join('');
   document.getElementById('cakeGrid').innerHTML=html||'<div style="text-align:center;padding:40px;color:var(--mu)">No cakes in this category</div>';
@@ -1488,7 +1519,7 @@ window.closeCakeModal=function(){
   document.body.style.overflow='';
 };
 function updateCakeModalOrderBtn(){
-  var btn=document.getElementById('cakeWAOrderBtn');
+  var btn=document.getElementById('cakeAddCartBtn');
   var note=document.getElementById('cakeClosedNote');
   var photoBtn=document.querySelector('#cm-photo-wa-row button');
   var open=isCakeOpen||DEV_ALWAYS_OPEN;
@@ -1496,6 +1527,32 @@ function updateCakeModalOrderBtn(){
   if(note){note.style.display=open?'none':'block';}
   if(photoBtn){photoBtn.disabled=!open;photoBtn.style.opacity=open?'1':'0.45';photoBtn.style.cursor=open?'pointer':'not-allowed';}
 }
+
+// Add cake to cart (same flow as fast food)
+window.addCakeToCart=function(){
+  if(!isCakeOpen&&!DEV_ALWAYS_OPEN){return;}
+  if(!_cmCake||!_cmWeight||!_cmFlavour)return;
+  var pname=(document.getElementById('cm-person-name').value||'').trim();
+  var page=(document.getElementById('cm-person-age').value||'').trim();
+  var pmsg=(document.getElementById('cm-person-msg').value||'').trim();
+  var note=(document.getElementById('cm-note').value||'').trim();
+  var metaParts=[_cmWeight.w, _cmFlavour];
+  if(pname) metaParts.push('Name: '+pname);
+  if(page) metaParts.push('Age: '+page);
+  if(pmsg) metaParts.push(pmsg);
+  if(note) metaParts.push(note);
+  if(_cmCake.isPhoto) metaParts.push('📸 Photo Cake');
+  var meta=metaParts.join(' · ');
+  var key='cake-'+_cmCake.id+'-'+_cmWeight.w.replace(/\s/g,'')+'-'+_cmFlavour.replace(/\s/g,'');
+  if(cart[key]) cart[key].qty+=_cmQty;
+  else cart[key]={n:_cmCake.name,e:'🎂',p:_cmWeight.p,qty:_cmQty,meta:meta,isCake:true,isPhoto:!!_cmCake.isPhoto};
+  // Flash button
+  var btn=document.getElementById('cakeAddCartBtn');
+  if(btn){var orig=btn.innerHTML;btn.textContent='✅ Added to Cart!';btn.style.background='var(--ok)';setTimeout(function(){btn.innerHTML=orig;btn.style.background='';},1000);}
+  renderCart();
+  // Auto-close modal after adding
+  setTimeout(function(){closeCakeModal();},900);
+};
 
 // Send photo via WhatsApp before ordering
 window.cakeSendPhotoWA=function(){
@@ -2051,15 +2108,15 @@ function checkStore(){
     b.className='';
     if(activeShop==='fastfood'){
       if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='TEST MODE: Store Open 24/7';}
-      else if(FASTFOOD_FORCED_CLOSE){b.className='bc';b.textContent='Fry Day is Temporarily Closed — Try our Cake Shop!';}
+      else if(FASTFOOD_FORCED_CLOSE){b.className='bc';b.textContent='Fry Day is Closed — Try Our Cake Shop!';}
       else if(isOpen){b.className='bo';b.textContent='Fry Day is Open! Order Now — Closes at 9:00 PM';}
-      else if(m<FASTFOOD_OPEN_FROM){b.className='bs';b.textContent='Fry Day Opens at 3:00 PM — Come Back Soon!';}
-      else{b.className='bc';b.textContent='Fry Day Closed — Opens Tomorrow at 3:00 PM';}
+      else if(m<FASTFOOD_OPEN_FROM){b.className='bs';b.textContent='Fry Day Opens at 3:00 PM';}
+      else{b.className='bc';b.textContent='Fry Day is Closed — Opens Tomorrow at 3:00 PM';}
     } else if(activeShop==='cake'){
       if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='TEST MODE: Bakery Open 24/7';}
-      else if(CAKE_FORCED_CLOSE){b.className='bc';b.textContent='Shri Ram Ji Bakery is Temporarily Closed — Come Back Soon!';}
+      else if(CAKE_FORCED_CLOSE){b.className='bc';b.textContent='Shri Ram Ji Bakery is Closed';}
       else if(isCakeOpen){b.className='bo';b.textContent='Shri Ram Ji Bakery is Open! Order Cakes — Closes at 9:00 PM';}
-      else if(m<CAKE_OPEN_FROM){b.className='bs';b.textContent='Bakery Opens at 10:00 AM — Come Back Soon!';}
+      else if(m<CAKE_OPEN_FROM){b.className='bs';b.textContent='Bakery Opens at 10:00 AM';}
       else{b.className='bc';b.textContent='Bakery Closed — Opens Tomorrow at 10:00 AM';}
     } else {
       const anyOpen=isOpen||isCakeOpen;
@@ -2069,7 +2126,12 @@ function checkStore(){
     }
   }
   if(activeShop==='fastfood'){
-    document.querySelectorAll('#msec .addbtn').forEach(function(btn){btn.disabled=!isOpen;});
+    document.querySelectorAll('#msec .addbtn').forEach(function(btn){btn.disabled=!isOpen&&!DEV_ALWAYS_OPEN;});
+  }
+  if(activeShop==='cake'){
+    document.querySelectorAll('#cakeGrid .addbtn').forEach(function(btn){btn.disabled=!isCakeOpen&&!DEV_ALWAYS_OPEN;});
+    var addCartBtn=document.getElementById('cakeAddCartBtn');
+    if(addCartBtn){addCartBtn.disabled=!isCakeOpen&&!DEV_ALWAYS_OPEN;addCartBtn.style.opacity=(isCakeOpen||DEV_ALWAYS_OPEN)?'1':'0.45';}
   }
 
   refreshOrderBtn();
@@ -2448,7 +2510,7 @@ function renderCart(){
   const foot=document.getElementById('cfoot');
   const fpbar=document.getElementById('fpbar');
   if(!keys.length){
-    body.innerHTML=`<div class="cempty"><span class="ee">🛒</span><h4>Your cart is empty!</h4><p>Looks like you haven't added<br/>anything yet. Let's fix that 🍕</p><button class="browse-btn" onclick="closeCart();document.getElementById('msec').scrollIntoView({behavior:'smooth'})">🍽️ Browse Menu</button></div>`;
+    body.innerHTML=`<div class="cempty"><span class="ee">🛒</span><h4>Your cart is empty!</h4><p>Looks like you haven't added<br/>anything yet. Let's fix that 🍕</p><button class="browse-btn" onclick="closeCart();(activeShop==='cake'?document.getElementById('cakeGrid'):document.getElementById('msec')).scrollIntoView({behavior:'smooth'})">🍽️ Browse Menu</button></div>`;
     foot.style.display='none';fpbar.style.display='none';return;
   }
   let sub=0;
@@ -2546,11 +2608,14 @@ function refreshOrderBtn(sub){
     btn.disabled=false;
     var note=document.getElementById('cnote');
     if(note){
-      if(!isOpen){
+      var hasCake=Object.keys(cart||{}).some(function(k){return cart[k]&&cart[k].isCake;});
+      var hasFf=Object.keys(cart||{}).some(function(k){return cart[k]&&!cart[k].isCake;});
+      var shopClosed=(hasFf&&!isOpen&&!DEV_ALWAYS_OPEN)||(hasCake&&!isCakeOpen&&!DEV_ALWAYS_OPEN);
+      if(shopClosed){
         note.style.display='block';
-        note.textContent=FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN
-          ?'Fry Day is temporarily closed — try our Cake Shop!'
-          :'Orders accepted 3:00 PM - 9:00 PM only';
+        note.textContent= hasFf&&!isOpen
+          ? (FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN?'🔴 Fry Day closed · Opens 3:00 PM':'🔴 Fast food: 3:00 PM – 9:00 PM only')
+          : '🔴 Bakery closed · Opens 10:00 AM';
       } else { note.style.display='none'; }
     }
     var cn=document.getElementById('checkoutNote');
@@ -2560,9 +2625,27 @@ function refreshOrderBtn(sub){
 async function placeOrder(){
   const keys=Object.keys(cart);
   if(!keys.length){bmAlert('Cart Empty 🛒','Please add some items to your cart first!','info');return;}
-  if(!isOpen){
-    var closedMsg=FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN?'Fry Day is temporarily closed. Try our Cake Shop!':'Fast food orders accepted 3:00 PM - 9:00 PM only.';
-    bmAlert('Fry Day is Closed',closedMsg,'info');return;
+
+  // Detect if this is a cake order or fast food order
+  var hasCakeItems = keys.some(function(k){return cart[k].isCake;});
+  var hasFfItems = keys.some(function(k){return !cart[k].isCake;});
+
+  if(hasCakeItems && !hasFfItems){
+    // Pure cake order — check cake shop open
+    if(!isCakeOpen&&!DEV_ALWAYS_OPEN){
+      bmAlert('Bakery is Closed 🎂','🔴 Closed · Opens at 10:00 AM','info');return;
+    }
+  } else if(!hasCakeItems){
+    // Pure fast food order — check fast food open
+    if(!isOpen&&!DEV_ALWAYS_OPEN){
+      var closedMsg=FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN?'🔴 Closed · Opens at 3:00 PM':'🔴 Closed · Orders accepted 3:00 PM – 9:00 PM only.';
+      bmAlert('Fry Day is Closed',closedMsg,'info');return;
+    }
+  } else {
+    // Mixed — check both
+    if((!isOpen||FASTFOOD_FORCED_CLOSE)&&!DEV_ALWAYS_OPEN&&(!isCakeOpen)&&!DEV_ALWAYS_OPEN){
+      bmAlert('Both Shops Closed 🔴','All shops are currently closed. Please check back during opening hours.','info');return;
+    }
   }
 
   // ================================================================
@@ -2629,7 +2712,7 @@ async function placeOrder(){
   var nowMs=Date.now();
   var orderObj={
     id:orderId,
-    itemsFull:items.map(function(i){return{n:i.n,e:i.e||'🍽️',p:i.p,qty:i.qty,meta:i.meta||''};}),
+    itemsFull:items.map(function(i){return{n:i.n,e:i.e||'🍽️',p:i.p,qty:i.qty,meta:i.meta||'',isCake:!!i.isCake,isPhoto:!!i.isPhoto};}),
     items:items.map(function(i){return i.n+' x'+i.qty;}).join(', '),
     subtotal:sub,
     delivery:del,
@@ -2690,7 +2773,9 @@ async function placeOrder(){
   '<div class="oc-item"><span>Delivery</span><span>'+(del===0?'FREE 🎉':'₹'+del)+'</span></div>'+
   '<div class="oc-item"><span>BudgetMein Service</span><span>₹'+platFee+'</span></div>'+
   '<div class="oc-item" style="border-top:2px solid var(--bd);margin-top:4px;font-weight:700;color:var(--p)"><span>Total Paid</span><span>₹'+totalFinal+'</span></div>'+
-  '<div style="font-size:.74rem;color:var(--mu);margin-top:8px;padding-top:8px;border-top:1px dashed var(--bd)">💵 Cash on Delivery &nbsp;|&nbsp; 📍 '+deliveryAddress+'</div>';
+  '<div style="font-size:.74rem;color:var(--mu);margin-top:8px;padding-top:8px;border-top:1px dashed var(--bd)">💵 Cash on Delivery &nbsp;|&nbsp; 📍 '+deliveryAddress+'</div>'+
+  // Photo cake reminder
+  (items.some(function(i){return i.isPhoto;})?'<div style="margin-top:10px;background:#FFF6F3;border-radius:8px;padding:10px 12px;font-size:.76rem;color:var(--tx);line-height:1.6;border:1px dashed rgba(255,69,0,.3)">📸 <b>Photo Cake Reminder:</b> Please send your photo on WhatsApp <b>at least 4 hours before</b> delivery.<br/><a href="https://wa.me/919625867683" target="_blank" style="display:inline-block;margin-top:6px;padding:6px 14px;background:linear-gradient(135deg,#16a34a,#15803d);color:#fff;border-radius:50px;text-decoration:none;font-weight:700;font-size:.76rem">📸 Send Photo on WhatsApp</a></div>':'');
 
   // Reset cart — isFirstOrderUser is already false above, so renderCart() shows ₹25
   cart={};renderCart();closeCart();
@@ -2740,6 +2825,9 @@ function backToMenu(){
   if(h1)h1.textContent='Order Placed! 🎉';
   var sub=document.querySelector('#orderConfirm .oc-sub');
   if(sub)sub.textContent='Estimated delivery: 30–45 minutes to Jahangir Puri';
+  // Return to the shop the customer was in
+  if(activeShop) enterShop(activeShop);
+  else showShopPicker();
 }
 
 
@@ -4717,15 +4805,13 @@ initTodaySpecial();
 function updateShopStatusBadges(){
   var ffB=document.getElementById('ffShopStatus');
   var ckB=document.getElementById('cakeShopStatus');
-  var ffOpen=(isOpen||DEV_ALWAYS_OPEN)&&!FASTFOOD_FORCED_CLOSE||DEV_ALWAYS_OPEN;
-  var ckOpen=isCakeOpen||DEV_ALWAYS_OPEN;
   function badge(el,open,closedLabel){
     if(!el)return;
     if(open){el.style.cssText='display:inline-block;padding:3px 10px;border-radius:50px;font-size:.66rem;font-weight:700;margin-bottom:7px;background:#F0FFF4;color:#16a34a;border:1px solid #B7F5C8';el.textContent='Open Now';}
     else{el.style.cssText='display:inline-block;padding:3px 10px;border-radius:50px;font-size:.66rem;font-weight:700;margin-bottom:7px;background:#FFF0F0;color:var(--er);border:1px solid #FFCDD2';el.textContent=closedLabel;}
   }
-  badge(ffB, DEV_ALWAYS_OPEN||(isOpen&&!FASTFOOD_FORCED_CLOSE), FASTFOOD_FORCED_CLOSE?'Temporarily Closed':'Closed');
-  badge(ckB, DEV_ALWAYS_OPEN||(isCakeOpen&&!CAKE_FORCED_CLOSE), CAKE_FORCED_CLOSE?'Temporarily Closed':'Closed');
+  badge(ffB, DEV_ALWAYS_OPEN||(isOpen&&!FASTFOOD_FORCED_CLOSE), FASTFOOD_FORCED_CLOSE?'Closed':'Closed');
+  badge(ckB, DEV_ALWAYS_OPEN||(isCakeOpen&&!CAKE_FORCED_CLOSE), 'Closed');
   var ffCard=document.getElementById('ffCard');
   var ckCard=document.getElementById('cakeCard');
   if(ffCard)ffCard.style.opacity=(FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)?'0.82':'1';
@@ -4735,6 +4821,8 @@ function showShopPicker(){
   activeShop=null;
   var els={shopPicker:'block',ffShopView:'none',cakeShopView:'none',msec:'none','s-cakes':'none',nr:'none'};
   Object.keys(els).forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=els[id];});
+  // Hide search bar on shop picker landing page
+  document.querySelector('nav').classList.add('search-hidden');
   checkStore();
   updateShopStatusBadges();
 }
@@ -4742,6 +4830,8 @@ function enterShop(shop){
   activeShop=shop;
   var sp=document.getElementById('shopPicker');
   if(sp)sp.style.display='none';
+  // Show search bar when inside a shop
+  document.querySelector('nav').classList.remove('search-hidden');
   if(shop==='fastfood'){
     var ffv=document.getElementById('ffShopView');
     var ckv=document.getElementById('cakeShopView');
@@ -4752,7 +4842,7 @@ function enterShop(shop){
     if(msec)msec.style.display='block';
     if(sc)sc.style.display='none';
     var notice=document.getElementById('ffClosedNotice');
-    if(notice)notice.style.display=(FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)?'block':'none';
+    if(notice)notice.style.display=(FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)?'flex':'none';
     setTimeout(function(){
       var pb=document.querySelector('#catrow .cpill[onclick*="pizza"]');
       if(pb&&typeof fcat==='function')fcat(pb,'pizza');
@@ -4766,6 +4856,8 @@ function enterShop(shop){
     if(ffv)ffv.style.display='none';
     if(msec)msec.style.display='none';
     if(sc)sc.style.display='block';
+    var cakeNotice=document.getElementById('cakeClosedNoticeBar');
+    if(cakeNotice)cakeNotice.style.display=(CAKE_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)||(!isCakeOpen&&!DEV_ALWAYS_OPEN)?'flex':'none';
     if(typeof renderCakeGrid==='function')renderCakeGrid();
     if(typeof updateCakeModalOrderBtn==='function')updateCakeModalOrderBtn();
   }
