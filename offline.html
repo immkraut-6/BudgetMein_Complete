@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1,user-scalable=no"/>
+  <title>BudgetMein — No Internet</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@700;800&family=Poppins:wght@400;600&display=swap" rel="stylesheet"/>
+  <style>
+    *{margin:0;padding:0;box-sizing:border-box}
+    body{font-family:'Poppins',sans-serif;background:linear-gradient(135deg,#1A1A2E 0%,#2C1A40 50%,#3D1200 100%);min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px;text-align:center;color:#fff;overscroll-behavior:none}
+    .offline-icon{font-size:5rem;margin-bottom:20px;animation:float 3s ease-in-out infinite}
+    @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-12px)}}
+    .brand{font-family:'Baloo 2',cursive;font-size:1.8rem;font-weight:800;margin-bottom:6px}
+    .brand span{color:#FFD700}
+    h1{font-family:'Baloo 2',cursive;font-size:1.4rem;font-weight:800;margin-bottom:10px;margin-top:24px}
+    p{font-size:.88rem;color:rgba(255,255,255,.7);line-height:1.7;max-width:320px;margin:0 auto 28px}
+    .retry-btn{display:inline-flex;align-items:center;gap:8px;padding:14px 32px;background:linear-gradient(135deg,#FF4500,#CC3700);color:#fff;border:none;border-radius:50px;font-family:'Poppins',sans-serif;font-size:.95rem;font-weight:700;cursor:pointer;box-shadow:0 8px 24px rgba(255,69,0,.4);transition:transform .2s}
+    .retry-btn:hover{transform:translateY(-2px)}
+    .retry-btn:active{transform:scale(.96)}
+    .tips{margin-top:32px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:16px;padding:18px 22px;text-align:left;max-width:320px}
+    .tips h4{font-size:.8rem;font-weight:700;color:rgba(255,255,255,.55);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px}
+    .tips li{font-size:.8rem;color:rgba(255,255,255,.65);margin-bottom:8px;list-style:none;display:flex;align-items:flex-start;gap:8px;line-height:1.5}
+  </style>
+</head>
+<body>
+  <div class="offline-icon">📡</div>
+  <div class="brand">Budget<span>Mein</span></div>
+  <p style="font-size:.75rem;color:rgba(255,255,215,.55);font-style:italic;margin-top:2px;margin-bottom:0">"Ghar Baitha Order Kar, Budget Mein Kha!"</p>
+
+  <h1>You're Offline 🌐</h1>
+  <p>Looks like your internet disconnected. Check your connection and try again to order food!</p>
+
+  <button class="retry-btn" onclick="window.location.reload()">
+    🔄 Retry Connection
+  </button>
+
+  <div class="tips">
+    <h4>Quick fixes</h4>
+    <ul>
+      <li>📶 Check your WiFi or mobile data</li>
+      <li>✈️ Turn off Airplane mode</li>
+      <li>🔄 Try switching between WiFi & data</li>
+      <li>📱 Restart your browser and try again</li>
+    </ul>
+  </div>
+</body>
+</html>
