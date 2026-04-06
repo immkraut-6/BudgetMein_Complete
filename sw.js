@@ -1,6 +1,6 @@
 // BudgetMein Service Worker v1.0
 const CACHE_NAME = 'budgetmein-v2-customer-notify';
-const PRECACHE = ['/', '/index.html', '/menu.html', '/manifest.json'];
+const PRECACHE = ['/', '/index.html', '/menu.html', '/offline.html', '/manifest.json'];
 
 self.addEventListener('install', function(e) {
   e.waitUntil(
@@ -36,7 +36,7 @@ self.addEventListener('fetch', function(e) {
         caches.open(CACHE_NAME).then(function(c) { c.put(e.request, clone); });
         return res;
       }).catch(function() {
-        return caches.match(e.request).then(function(c) { return c || caches.match('/index.html'); });
+        return caches.match(e.request).then(function(c) { return c || caches.match('/offline.html'); });
       })
     );
     return;
