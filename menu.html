@@ -48,10 +48,10 @@ window.bmAddOrderDoc = async function(payload){
       totalPrice: payload.totalPrice,
       createdAt:  payload.createdAt
     });
-    console.log('[BudgetMein] ? Direct order doc saved | docId=' + ref.id);
+
     return ref.id;
   }catch(e){
-    console.warn('[BudgetMein] bmAddOrderDoc error', e);
+
   }
 };
 
@@ -118,7 +118,7 @@ window.bmGetNextOrderId = async function(){
     });
     return 'BM-' + String(nextNum).padStart(4,'0');
   }catch(e){
-    console.warn('[BudgetMein] Order ID fallback to local',e);
+
     // Fallback ï¿½ use timestamp
     return 'BM-' + Date.now().toString().slice(-6);
   }
@@ -134,7 +134,7 @@ window.bmCheckHasOrdered = async function(uid){
     const snap = await getDoc(doc(db,'users',uid));
     return snap.exists() && snap.data().hasOrdered === true;
   }catch(e){
-    console.warn('[BudgetMein] bmCheckHasOrdered error',e);
+
     return false; // Default false = first order (safe ï¿½ will correct on Firestore recovery)
   }
 };
@@ -142,10 +142,10 @@ window.bmSetHasOrdered = async function(uid){
   try{
     const {setDoc:_sd}=await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js');
     await _sd(doc(db,'users',uid),{hasOrdered:true,updatedAt:serverTimestamp()},{merge:true});
-    console.log('[BudgetMein] ? hasOrdered:true saved to Firestore uid='+uid);
+
     return true;
   }catch(e){
-    console.warn('[BudgetMein] ? bmSetHasOrdered error',e);
+
     return false;
   }
 };
@@ -215,7 +215,7 @@ window.bmSaveUserProfile = async function(uidOrEmail, profileData){
     // Use current Firebase auth UID (most reliable)
     const currentUser = auth.currentUser;
     const uid = currentUser ? currentUser.uid : uidOrEmail;
-    if(!uid){ console.warn('[BudgetMein] No UID for profile save'); return; }
+    if(!uid){ return; return; }
     const userRef = doc(db, 'users', uid);
     const {setDoc} = await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js');
     var saveData = {updatedAt: serverTimestamp()};
@@ -237,9 +237,9 @@ window.bmSaveUserProfile = async function(uidOrEmail, profileData){
     saveData.defaultAddressId = profileData.defaultAddressId || addrBook.defaultAddressId || '';
     saveData.selectedAddressId = profileData.selectedAddressId || addrBook.selectedAddressId || saveData.defaultAddressId || '';
     await setDoc(userRef, saveData, {merge: true});
-    console.log('[BudgetMein] ? Profile saved to Firestore uid='+uid);
+
   }catch(e){
-    console.warn('[BudgetMein] Could not save profile',e);
+
   }
 };
 
@@ -311,13 +311,13 @@ window.bmLoadUserProfile = async function(uid){
 
         // Mark profile complete ï¿½ no popup
         if(data.phone && data.name) localStorage.setItem('bm_profile_popup_done','1');
-        console.log('[BudgetMein] Profile loaded from Firestore ?');
+
         return true;
       }
     }
     return false;
   }catch(e){
-    console.warn('[BudgetMein] Could not load profile',e);
+
     return false;
   }
 };
@@ -343,7 +343,7 @@ onAuthStateChanged(auth, async function(user){
     var firebaseEmail = (user.email||'').toLowerCase().trim();
     // If uid or email doesn't match ? completely different person on this device
     if((lastUid && lastUid !== user.uid) || (localEmail && firebaseEmail && localEmail !== firebaseEmail)){
-      console.log('[BudgetMein] Different account detected ï¿½ clearing old data');
+
       ['bm_user','bm_orders','bm_feedbacks','bm_addresses','bm_selected_address_id',
        'bm_default_address_id','bm_ts','bm_to','bm_oc','bm_cart_addr_full',
        'bm_profile_popup_done','bm_pwa_installed','bm_active_uid'].forEach(function(k){
@@ -406,12 +406,8 @@ onAuthStateChanged(auth, async function(user){
   var delay = Math.max(0, 1400 - elapsed);
   setTimeout(function(){ if(typeof window._bmHideSplash==='function') window._bmHideSplash(); }, delay);
 });
-// SECURE: Token lives in Vercel Environment Variables (TG_BOT_TOKEN)
-// Calls /api/telegram serverless function - token never exposed to browser
-const TG_BOT_TOKEN = ''; // Removed - handled server-side via /api/telegram
-const TG_CHAT_ID   = '6932599524';
+// Sends notifications via /api/telegram serverless function (token is server-side only)
 async function tg(kind, msg){
-  // Try /api/telegram serverless route first
   try{
     const resp = await fetch("/api/telegram", {
       method:  "POST",
@@ -419,36 +415,14 @@ async function tg(kind, msg){
       body:    JSON.stringify({ kind, msg })
     });
     const data = await resp.json().catch(()=>({}));
-    if(resp.ok && data.ok !== false){
-      return; // ? Success via serverless
+    if(!resp.ok || data.ok===false){
+      // silent fail — no sensitive info logged
     }
-    console.warn("TG serverless error, falling back:", data.description||JSON.stringify(data));
   }catch(e){
-    console.warn("TG serverless unavailable, using direct fallback:", e.message||e);
-  }
-  // Direct Telegram Bot API fallback
-  try{
-    const fbResp = await fetch(
-      'https://api.telegram.org/bot'+TG_BOT_TOKEN+'/sendMessage',
-      {
-        method: 'POST',
-        headers: {'Content-Type':'application/json'},
-        body: JSON.stringify({
-          chat_id:    TG_CHAT_ID,
-          text:       msg,
-          parse_mode: 'HTML'
-        })
-      }
-    );
-    const fbData = await fbResp.json().catch(()=>({}));
-    if(!fbData.ok){
-      console.warn('TG direct error:', fbData.description||JSON.stringify(fbData));
-    }
-  }catch(e2){
-    console.warn('TG direct fallback also failed:', e2.message||e2);
+    // silent fail
   }
 }
-window.tg = tg; // expose to regular scripts
+window.tg = tg; 
 // ================================================================
 // CANCEL COUNT HELPERS ï¿½ exposed to regular scripts
 // Must live here (module scope) so getDoc/updateDoc/etc are in scope
@@ -473,12 +447,12 @@ window.bmIncrementCancelCount = async function(){
       cancelLog:{date:new Date().toDateString(), count:current+1},
       updatedAt:serverTimestamp()
     });
-  }catch(e){ console.warn('bmIncrementCancelCount err',e); }
+  }catch(e){  }
 };
 
 // ================================================================
 // GET ORDER FROM FIRESTORE ï¿½ exposed to regular scripts
-// Must live here (module scope) so query/collection/etc are in scope
+
 // ================================================================
 window.bmGetOrderFromFirestore = async function(orderId){
   try{
@@ -498,7 +472,7 @@ window.bmGetOrderFromFirestore = async function(orderId){
     });
     return found;
   }catch(e){
-    console.warn('bmGetOrderFromFirestore err', e);
+
     return null;
   }
 };
@@ -537,16 +511,17 @@ window.bmSaveOrder=async function(orderData){
     };
     const ref=await addDoc(collection(db,'orders'),firestoreData);
     window._activeOrderDocId=ref.id;
-    console.log('? Order saved to Firestore | orderId='+orderData.id+' | docId='+ref.id);
+
     return ref.id;
-  }catch(e){console.warn('FB err',e);}
+  }catch(e){}
 };
 window.bmOrderTG=async function(order,items,sub,del,plat){
   const u=JSON.parse(localStorage.getItem('bm_user')||'{}');
   const t=new Date().toLocaleString('en-IN',{hour:'2-digit',minute:'2-digit',day:'2-digit',month:'short'});
   var hasCake=items.some(function(i){return i.isCake;});
-  var hasFf=items.some(function(i){return !i.isCake;});
-  var shopLabel=hasCake&&!hasFf?'CAKE ORDER':hasFf&&!hasCake?'FAST FOOD ORDER':'MIXED ORDER';
+  var hasBiryani=items.some(function(i){return i.shop==='biryani';});
+  var hasFf=items.some(function(i){return !i.isCake && i.shop!=='biryani';});
+  var shopLabel=hasBiryani&&!hasCake&&!hasFf?'BIRYANI ORDER':hasCake&&!hasFf&&!hasBiryani?'CAKE ORDER':hasFf&&!hasCake&&!hasBiryani?'FAST FOOD ORDER':'MIXED ORDER';
   const lines=items.map(function(i,idx){
     return(idx+1)+'. '+(i.n||i.name)+(i.meta?' ('+i.meta+')':'')+' x'+(i.qty||i.quantity)+'  -  <b>'+bmMoney((i.p||i.price)*(i.qty||i.quantity))+'</b>';
   }).join('\n');
@@ -622,9 +597,9 @@ window.bmLoadMenuFromFirestore=async function(){
       });
       renderMenu();renderCart();
     }
-    console.log('? Menu prices loaded from Firestore');
+
     return true;
-  }catch(e){console.warn('Menu Firestore load err',e);return false;}
+  }catch(e){return false;}
 };
 window.checkOrderStatus=async function(orderId){
   try{
@@ -650,7 +625,7 @@ window.markOrderDelivered=async function(orderId){
     });
     await Promise.all(promises);
     return true;
-  }catch(e){console.warn("markDelivered err",e);return false;}
+  }catch(e){return false;}
 };
 window.cancelOrderInFirebase=async function(orderId, reason){
   // Fast path: use the doc ID saved when order was placed
@@ -658,9 +633,9 @@ window.cancelOrderInFirebase=async function(orderId, reason){
   if(directDocId){
     try{
       await updateDoc(doc(db,"orders",directDocId),{status:"Cancelled",cancelReason:reason||"",cancelledAt:Date.now()});
-      console.log("[BM] cancelOrder direct OK | docId="+directDocId);
+
       return true;
-    }catch(e2){ console.warn("[BM] direct cancel failed, trying query",e2); }
+    }catch(e2){  }
   }
   // Fallback: query by userId + orderId
   var uid=window._bmUserId||(auth.currentUser&&auth.currentUser.uid)||"";
@@ -688,8 +663,8 @@ window.deleteOrderFromFirebase=async function(orderId){
       if(d.data().id===orderId) promises.push(deleteDoc(doc(db,"orders",d.id)));
     });
     await Promise.all(promises);
-    console.log("? Deleted from Firebase:",orderId);
-  }catch(e){console.warn("Firebase delete err",e);}
+
+  }catch(e){}
 };
 window.deleteAllOrdersFromFirebase=async function(){
   try{
@@ -703,8 +678,8 @@ window.deleteAllOrdersFromFirebase=async function(){
       if(!phone||dp===phone||dp==='') promises.push(deleteDoc(doc(db,"orders",d.id)));
     });
     await Promise.all(promises);
-    console.log("? All orders deleted from Firebase");
-  }catch(e){console.warn("Firebase deleteAll err",e);}
+
+  }catch(e){}
 };
 window.loadOrdersFromFirebase=async function(){
   try{
@@ -726,7 +701,7 @@ window.loadOrdersFromFirebase=async function(){
       return orders;
     }
     return null;
-  }catch(e){console.warn("FB load err",e);return null;}
+  }catch(e){return null;}
 };
 </script>
 
@@ -744,7 +719,8 @@ body.page-leaving{opacity:0;transition:opacity .2s ease}
 .bc{background:linear-gradient(90deg,#96281B,#C0392B);color:#fff}
 #ffCard:hover{border-color:var(--p)!important;transform:translateY(-3px);box-shadow:0 8px 28px rgba(255,69,0,.2)!important}
 #cakeCard:hover{border-color:#7C3AED!important;transform:translateY(-3px);box-shadow:0 8px 28px rgba(124,58,237,.2)!important}
-#ffCard:active,#cakeCard:active{transform:scale(.97)!important}
+#ffCard:active,#cakeCard:active,#biryaniCard:active{transform:scale(.97)!important}
+#biryaniCard:hover{border-color:#16a34a!important;transform:translateY(-3px);box-shadow:0 8px 28px rgba(22,163,74,.2)!important}
 #mainNav{position:sticky;top:36px;z-index:1150;padding:14px 5% 12px;background:linear-gradient(180deg,rgba(15,17,31,.98),rgba(26,26,46,.96));backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,.06);box-shadow:0 18px 40px rgba(8,10,24,.18)}
 #mainNav>div:first-child,#shopSwitcherBar>div,#smartCategoryBar,.promo-head,.promo-carousel,.promo-dots{max-width:1180px;margin-left:auto;margin-right:auto;width:100%}
 .nav-top{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:12px}
@@ -787,8 +763,9 @@ body.page-leaving{opacity:0;transition:opacity .2s ease}
 #shopSwitcherBar>div{display:flex!important;gap:10px!important;height:auto!important;overflow-x:auto;scrollbar-width:none}
 #shopSwitcherBar>div::-webkit-scrollbar{display:none}
 #shopSwitcherBar>div>button:first-child,#shopSwitcherBar>div>div{display:none!important}
-#shopSwitcherBar>div>#ssBtnFf,#shopSwitcherBar>div>#ssBtnCake{border:none!important;background:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.72)!important;padding:10px 15px!important;border-radius:16px!important;font-size:.78rem!important;font-weight:700!important}
-#shopSwitcherBar>div>#ssBtnFf.active,#shopSwitcherBar>div>#ssBtnCake.active{background:linear-gradient(135deg,var(--p),var(--pd))!important;color:#fff!important;box-shadow:0 10px 22px rgba(255,69,0,.24)!important}
+#shopSwitcherBar>div>#ssBtnFf,#shopSwitcherBar>div>#ssBtnCake,#shopSwitcherBar>div>#ssBtnBiryani{border:none!important;background:rgba(255,255,255,.06)!important;color:rgba(255,255,255,.72)!important;padding:10px 15px!important;border-radius:16px!important;font-size:.78rem!important;font-weight:700!important}
+#shopSwitcherBar>div>#ssBtnFf.active,#shopSwitcherBar>div>#ssBtnCake.active,#shopSwitcherBar>div>#ssBtnBiryani.active{background:linear-gradient(135deg,var(--p),var(--pd))!important;color:#fff!important;box-shadow:0 10px 22px rgba(255,69,0,.24)!important}
+#shopSwitcherBar>div>#ssBtnBiryani.active{background:linear-gradient(135deg,#16a34a,#15803d)!important;box-shadow:0 10px 22px rgba(22,163,74,.24)!important}
 .smart-cats{display:none;gap:8px;overflow-x:auto;scrollbar-width:none;padding-top:10px}
 .smart-cats::-webkit-scrollbar{display:none}
 .smart-cats.on{display:flex}
@@ -1314,6 +1291,7 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
       <div style="width:1px;height:16px;background:rgba(255,255,255,.15);flex-shrink:0"></div>
       <button id="ssBtnFf" onclick="enterShop('fastfood')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 13px;border-radius:50px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:var(--fb);white-space:nowrap;flex-shrink:0;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)">Fast Food</button>
       <button id="ssBtnCake" onclick="enterShop('cake')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 13px;border-radius:50px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:var(--fb);white-space:nowrap;flex-shrink:0;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)">Bakery</button>
+      <button id="ssBtnBiryani" onclick="enterShop('biryani')" style="display:inline-flex;align-items:center;gap:5px;padding:4px 13px;border-radius:50px;font-size:.7rem;font-weight:700;cursor:pointer;font-family:var(--fb);white-space:nowrap;flex-shrink:0;border:1.5px solid rgba(255,255,255,.2);background:rgba(255,255,255,.07);color:rgba(255,255,255,.8)">Biryani</button>
     </div>
   </div>
   <div id="smartCategoryBar" class="smart-cats"></div>
@@ -1348,7 +1326,7 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
       <article class="promo-slide">
         <div class="promo-content">
           <div class="promo-kicker">Bakery Corner</div>
-          <div class="promo-title">Celebration cakes with photo-cake and flavor options</div>
+          <div class="promo-title">Celebration cakes with photo-cake and flavour options</div>
           <div class="promo-copy">Move from discovery to order quickly with one bakery view for kids, chocolate, fruit, and photo cakes.</div>
           <div class="promo-pill">Birthday-ready favourites</div>
         </div>
@@ -1378,7 +1356,7 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
   <div style="background:linear-gradient(135deg,#1A1A2E 0%,#2C1A40 55%,#3D1200 100%);padding:32px 5% 28px;text-align:center;position:relative;overflow:hidden">
     <div style="position:absolute;inset:0;background:radial-gradient(ellipse at 60% 40%,rgba(255,69,0,.18),transparent 65%)"></div>
     <div style="position:relative;z-index:1">
-      <div style="font-size:1rem;margin-bottom:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.58);font-weight:700">Two Stores. One Smooth Ordering Flow.</div>
+      <div style="font-size:1rem;margin-bottom:10px;letter-spacing:.18em;text-transform:uppercase;color:rgba(255,255,255,.58);font-weight:700">Three Stores. One Smooth Ordering Flow.</div>
       <h2 style="font-family:var(--fl);font-size:1.7rem;font-weight:800;color:#fff;margin-bottom:6px;line-height:1.2">
         Ghar Baitha Order Kar,<br/><span style="color:#FFD700">Budget Mein Kha!</span>
       </h2>
@@ -1420,6 +1398,30 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
         <div id="cakeShopStatus" style="display:inline-block;padding:3px 10px;border-radius:50px;font-size:.66rem;font-weight:700;margin-bottom:7px"></div>
         <div style="font-size:.67rem;color:var(--mu);line-height:1.6">Custom Cakes &#x2022; Photo Cakes<br/>Kids &#x2022; Tiered &#x2022; Wedding</div>
         <div style="font-size:.63rem;color:var(--mu);margin-top:5px">10:00 AM &#x2013; 9:00 PM</div>
+      </div>
+    </div>
+    <!-- BIRYANI SHOP CARD - full width below -->
+  </div>
+  <div style="max-width:480px;margin:14px auto 0">
+    <!-- SHRI RADHE RADHE BIRYANI CARD -->
+    <div id="biryaniCard" onclick="enterShop('biryani')" style="cursor:pointer;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 4px 20px rgba(0,0,0,.10);border:2px solid transparent;transition:all .25s">
+      <div style="background:linear-gradient(135deg,#064E3B,#16a34a,#15803d);padding:18px 12px 12px;text-align:center;display:flex;align-items:center;justify-content:center;gap:14px">
+        <div style="font-size:2.4rem;line-height:1">&#x1F372;</div>
+        <div style="text-align:left">
+          <div style="font-family:var(--fl);font-size:1rem;font-weight:800;color:#fff">Shri Radhe Radhe</div>
+          <div style="font-size:.65rem;color:rgba(255,255,255,.7);margin-top:2px">&#x1F7E2; Veg Biryani</div>
+        </div>
+        <div style="margin-left:auto;background:rgba(255,255,255,.18);border-radius:50px;padding:3px 10px;font-size:.62rem;font-weight:700;color:#fff;white-space:nowrap">NEW &#x2728;</div>
+      </div>
+      <div style="padding:10px 14px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <div>
+          <div id="biryaniShopStatus" style="display:inline-block;padding:3px 10px;border-radius:50px;font-size:.66rem;font-weight:700;margin-bottom:5px"></div>
+          <div style="font-size:.67rem;color:var(--mu);line-height:1.6">Veg Biryani &#x2022; 250g &#x2022; 400g &#x2022; 500g</div>
+          <div style="font-size:.63rem;color:var(--mu);margin-top:3px">&#x23F0; 9:00 AM &#x2013; 2:00 PM &nbsp;&#x22C5;&nbsp; &#x1F6F5; 25 min delivery</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          <div style="font-family:var(--fl);font-size:.85rem;font-weight:800;color:#16a34a">From &#8377;39</div>
+        </div>
       </div>
     </div>
   </div>
@@ -1491,6 +1493,37 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
       <button class="cake-fpill" onclick="setCakeFilter('tiered',this)">Tiered</button>
     </div>
     <div class="mgrid" id="cakeGrid"></div>
+  </div>
+</div>
+
+<!-- BIRYANI SHOP VIEW -->
+<div id="biryaniShopView" style="display:none">
+  <section class="hero" style="background:linear-gradient(135deg,#052E16,#064E3B,#166534)">
+    <div class="ht">
+      <div style="margin-bottom:10px">
+        <button onclick="goBackToShopPicker()" style="background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.25);color:#fff;border-radius:50px;padding:5px 14px;font-size:.72rem;font-weight:600;cursor:pointer;font-family:var(--fb)">&#x2190; All Shops</button>
+      </div>
+      <h1>Shri Radhe Radhe &#x1F372;</h1>
+      <p style="font-size:.8rem;color:rgba(255,255,255,.6);margin-bottom:6px">K Block, Jahangir Puri, Delhi 110033</p>
+      <p>Fresh veg biryani delivered hot to your door.</p>
+      <div class="hbadges">
+        <span class="hb" style="background:rgba(22,163,74,.3);border-color:rgba(22,163,74,.6)">&#x23F0; 25 min delivery</span>
+        <span class="hb">&#x1F4CD; Jahangir Puri</span>
+        <span class="hb">&#x1F7E2; 100% Veg</span>
+      </div>
+    </div>
+    <div class="hemoji">&#x1F372;<br/>&#x1F33F; &#x2728;</div>
+  </section>
+  <div id="biryaniClosedNotice" style="display:none;margin:0 5% 4px;background:#FFF3F3;border-left:4px solid var(--er);border-radius:10px;padding:10px 16px;align-items:center;justify-content:space-between;gap:10px">
+    <div>
+      <span style="font-family:var(--fl);font-size:.88rem;font-weight:800;color:var(--er)">Closed</span>
+      <span style="font-size:.76rem;color:#7B3B3B;margin-left:8px">Opens at 9:00 AM</span>
+    </div>
+  </div>
+  <!-- Biryani Products Section -->
+  <div class="section" id="biryaniSection">
+    <h2 class="stitle" style="--p:#16a34a">&#x1F372; Veg Biryani</h2>
+    <div class="mgrid" id="biryaniGrid"></div>
   </div>
 </div>
 
@@ -1855,7 +1888,7 @@ document.getElementById('srch').addEventListener('input',function(){
 
 <footer>
   <div class="ftop">
-    <div class="fbrand"><div class="fn">Budget<span>Mein</span></div><p>Fast food and celebration cakes, delivered across Jahangir Puri with a cleaner app-style experience.</p></div>
+    <div class="fbrand"><div class="fn">Budget<span>Mein</span></div><p>Fast food, celebration cakes &amp; fresh veg biryani, delivered across Jahangir Puri with a cleaner app-style experience.</p></div>
     <div class="fcol"><h4>Support</h4><p>Call: +91 96258 67683</p><a href="https://wa.me/919625867683" target="_blank">WhatsApp Support</a><p>Hours: Mon-Sun, 3:00 PM - 9:00 PM</p><p>Area: Jahangir Puri, Delhi 110033</p></div>
     <div class="fcol"><h4>Policies</h4><a href="#" onclick="event.preventDefault();openTermsModal()">Terms &amp; Conditions</a><a href="#" onclick="event.preventDefault();openPrivacyModal()">Privacy Policy</a></div>
   </div>
@@ -2216,15 +2249,20 @@ const FASTFOOD_OPEN_UNTIL   = 1260;  // 9:00 PM  (21 ï¿½ 60 = 1260 minutes)
 const FASTFOOD_FORCED_CLOSE = false; // false = use timing above (set true to force close)
 
 // -- CAKE SHOP: Shri Ram Ji Bakery --
-const CAKE_OPEN_FROM    = 600;    // 10:00 AM (10 ï¿½ 60 = 600 minutes)
-const CAKE_OPEN_UNTIL   = 1260;   // 9:00 PM  (21 ï¿½ 60 = 1260 minutes)
+const CAKE_OPEN_FROM    = 600;    // 10:00 AM (10 × 60 = 600 minutes)
+const CAKE_OPEN_UNTIL   = 1260;   // 9:00 PM  (21 × 60 = 1260 minutes)
 const CAKE_FORCED_CLOSE = false;  // false = use timing above
+
+// -- BIRYANI SHOP: Shri Radhe Radhe --
+const BIRYANI_OPEN_FROM    = 540;   // 9:00 AM  (9 × 60 = 540 minutes)
+const BIRYANI_OPEN_UNTIL   = 840;   // 2:00 PM  (14 × 60 = 840 minutes)
+const BIRYANI_FORCED_CLOSE = false; // false = use timing above
 
 // Legacy aliases (do not remove)
 const OPEN_FROM_MINUTES  = FASTFOOD_OPEN_FROM;
 const OPEN_UNTIL_MINUTES = FASTFOOD_OPEN_UNTIL;
 
-// TEST MODE ï¿½ set false for production (uses real shop timings above)
+// Set to false for production
 const DEV_ALWAYS_OPEN = false; // false = use real timings
 // DEBUG MODE
 const DEV_SHOW_DEBUG = false;
@@ -2327,7 +2365,60 @@ drinks:[]
 };
 const LABS={pizza:'Pizza',burger:'Burgers',wrap:'Wraps',fries:'Fries',sandwich:'Sandwiches',drinks:'Cold Drinks'};
 const BDGMAP={bs:'Bestseller',sp:'Spicy',ml:'Most Loved'};
-let isOpen=false,isCakeOpen=false,cart={};
+
+// ---- BIRYANI DATA ----
+const BIRYANI_IMG = 'https://res.cloudinary.com/dklefbj2a/image/upload/v1775571413/WhatsApp_Image_2026-04-07_at_7.46.13_PM_zcglo1.jpg';
+const BIRYANI_MENU = [
+  {id:'br1', n:'Veg Biryani', d:'Aromatic basmati rice with fresh vegetables & whole spices', sizes:{'250g':39,'400g':49,'500g':69}, img:BIRYANI_IMG},
+];
+
+function renderBiryaniGrid(){
+  var grid=document.getElementById('biryaniGrid');
+  if(!grid) return;
+  var enabled=isBiryaniOpen||DEV_ALWAYS_OPEN;
+  grid.innerHTML=BIRYANI_MENU.map(function(item){
+    var sizeHtml=Object.keys(item.sizes).map(function(sz){
+      var price=item.sizes[sz];
+      var key=item.id+'-'+sz;
+      var qty=cart[key]?cart[key].qty:0;
+      return '<div style="background:#F8FFF8;border:1.5px solid #BBF7D0;border-radius:12px;padding:10px 10px 10px;display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px">'
+        +'<div>'
+          +'<div style="font-size:.82rem;font-weight:700;color:#166534">'+sz+'</div>'
+          +'<div style="font-size:.75rem;color:#16a34a;font-weight:700">&#8377;'+price+'</div>'
+          +'<div style="font-size:.65rem;color:#6b7280;margin-top:1px">&#x1F6F5; 25 min delivery</div>'
+        +'</div>'
+        +(qty>0
+          ?'<div style="display:flex;align-items:center;gap:6px">'
+            +'<button onclick="biryaniQtyChange(\''+key+'\',\''+item.n+'\','+price+',\''+sz+'\',\''+item.img+'\',-1)" style="width:28px;height:28px;border-radius:50%;border:none;background:#16a34a;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">&#x2212;</button>'
+            +'<span style="font-size:.88rem;font-weight:700;min-width:18px;text-align:center" id="bqty-'+key+'">'+qty+'</span>'
+            +'<button onclick="biryaniQtyChange(\''+key+'\',\''+item.n+'\','+price+',\''+sz+'\',\''+item.img+'\',1)" style="width:28px;height:28px;border-radius:50%;border:none;background:#16a34a;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">+</button>'
+          +'</div>'
+          :'<button class="addbtn" style="background:linear-gradient(135deg,#16a34a,#15803d);box-shadow:0 4px 10px rgba(22,163,74,.3)" onclick="biryaniQtyChange(\''+key+'\',\''+item.n+'\','+price+',\''+sz+'\',\''+item.img+'\',1)" '+(enabled?'':' disabled')+'>+ Add</button>'
+        )
+        +'</div>';
+    }).join('');
+    return '<div class="mcard" style="border:1.5px solid #BBF7D0">'
+      +'<div class="cewrap" style="background:linear-gradient(135deg,#F0FFF4,#DCFCE7)">'
+        +'<img src="'+item.img+'" alt="'+item.n+'" style="width:100%;height:100%;object-fit:cover;display:block" onerror="this.style.display=\'none\'">'
+      +'</div>'
+      +'<div style="padding:12px 12px 14px">'
+        +'<div style="font-family:var(--fl);font-size:1rem;font-weight:800;color:var(--tx);margin-bottom:3px">'+item.n+'</div>'
+        +'<div style="font-size:.76rem;color:var(--mu);margin-bottom:10px;line-height:1.5">'+item.d+'</div>'
+        +'<div style="font-size:.7rem;font-weight:700;color:#16a34a;margin-bottom:10px;background:#F0FFF4;display:inline-block;padding:2px 10px;border-radius:50px;border:1px solid #BBF7D0">&#x1F7E2; Pure Veg</div>'
+        +sizeHtml
+      +'</div>'
+    +'</div>';
+  }).join('');
+}
+
+function biryaniQtyChange(key, name, price, size, img, delta){
+  if(!cart[key]) cart[key]={id:key, n:name+' ('+size+')', p:price, qty:0, img:img, shop:'biryani'};
+  cart[key].qty = Math.max(0, (cart[key].qty||0)+delta);
+  if(cart[key].qty===0) delete cart[key];
+  renderBiryaniGrid();
+  renderCart();
+}
+let isOpen=false,isCakeOpen=false,isBiryaniOpen=false,cart={};
 var activeShop=null;
 window._shopSwitchToken = 0;
 
@@ -2349,26 +2440,34 @@ function checkStore(){
   isOpen=!FASTFOOD_FORCED_CLOSE&&ffOk;
   const cakeOk=DEV_ALWAYS_OPEN||(m>=CAKE_OPEN_FROM&&m<CAKE_OPEN_UNTIL);
   isCakeOpen=!CAKE_FORCED_CLOSE&&cakeOk;
+  const biryaniOk=DEV_ALWAYS_OPEN||(m>=BIRYANI_OPEN_FROM&&m<BIRYANI_OPEN_UNTIL);
+  isBiryaniOpen=!BIRYANI_FORCED_CLOSE&&biryaniOk;
   const b=document.getElementById('banner');
   if(b){
     b.className='';
     if(activeShop==='fastfood'){
-      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='TEST MODE: Store Open 24/7';}
+      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
       else if(FASTFOOD_FORCED_CLOSE){b.className='bc';b.textContent='Fry Day is closed - try our bakery shop';}
       else if(isOpen){b.className='bo';b.textContent='Fry Day is open - closes at 9:00 PM';}
       else if(m<FASTFOOD_OPEN_FROM){b.className='bs';b.textContent='Fry Day Opens at 3:00 PM';}
       else{b.className='bc';b.textContent='Fry Day is closed - opens tomorrow at 3:00 PM';}
     } else if(activeShop==='cake'){
-      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='TEST MODE: Bakery Open 24/7';}
+      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
       else if(CAKE_FORCED_CLOSE){b.className='bc';b.textContent='Shri Ram Ji Bakery is Closed';}
       else if(isCakeOpen){b.className='bo';b.textContent='Shri Ram Ji Bakery is open - closes at 9:00 PM';}
       else if(m<CAKE_OPEN_FROM){b.className='bs';b.textContent='Bakery Opens at 10:00 AM';}
       else{b.className='bc';b.textContent='Bakery closed - opens tomorrow at 10:00 AM';}
+    } else if(activeShop==='biryani'){
+      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
+      else if(BIRYANI_FORCED_CLOSE){b.className='bc';b.textContent='Shri Radhe Radhe is Closed';}
+      else if(isBiryaniOpen){b.className='bo';b.textContent='Shri Radhe Radhe is open - closes at 2:00 PM';}
+      else if(m<BIRYANI_OPEN_FROM){b.className='bs';b.textContent='Biryani Shop Opens at 9:00 AM';}
+      else{b.className='bc';b.textContent='Biryani Shop closed - opens tomorrow at 9:00 AM';}
     } else {
-      const anyOpen=isOpen||isCakeOpen;
-      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='TEST MODE: All Shops Open 24/7';}
+      const anyOpen=isOpen||isCakeOpen||isBiryaniOpen;
+      if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
       else if(anyOpen){b.className='bo';b.textContent="We're Open! Choose your shop below";}
-      else{b.className='bc';b.textContent='All shops closed - Fast Food: 3-9 PM | Bakery: 10 AM-9 PM';}
+      else{b.className='bc';b.textContent='All shops closed - Fast Food: 3-9 PM | Bakery: 10 AM-9 PM | Biryani: 9 AM-2 PM';}
     }
   }
   if(activeShop==='fastfood'){
@@ -2390,6 +2489,13 @@ function checkStore(){
       addCartBtn.style.opacity=_cakeEnabled?'1':'0.45';
       addCartBtn.style.cursor=_cakeEnabled?'pointer':'not-allowed';
     }
+  }
+  if(activeShop==='biryani'){
+    var _biryaniEnabled = isBiryaniOpen||DEV_ALWAYS_OPEN;
+    document.querySelectorAll('#biryaniGrid .addbtn').forEach(function(btn){
+      btn.disabled=!_biryaniEnabled;
+      btn.style.opacity=_biryaniEnabled?'1':'0.5';
+    });
   }
 
   refreshOrderBtn();
@@ -2581,7 +2687,7 @@ async function bmCheckHasOrdered(uid){
   // ? FIX: Delegate to module-level window.bmCheckHasOrdered which has Firestore db access.
   // The old code used `db` directly ï¿½ but `db` is module-scoped and inaccessible in regular
   // scripts ? ReferenceError caught silently ? always returned false ? every login = first
-  // order = free delivery BUG FIXED by using the module-exposed window function below.
+  
   if(typeof window.bmCheckHasOrdered==='function') return window.bmCheckHasOrdered(uid);
   return false; // Safe fallback
 }
@@ -2592,11 +2698,11 @@ async function preloadFirstOrderStatus(uid){
   try{
     var hasOrdered = await bmCheckHasOrdered(uid);
     isFirstOrderUser = !hasOrdered;
-    console.log('[BudgetMein] First order status:', isFirstOrderUser ? 'YES - free delivery' : 'NO - ?25 delivery');
+
   }catch(e){
     // On error, default to ?25 (safe ï¿½ never give free delivery on uncertainty)
     isFirstOrderUser = false;
-    console.warn('[BudgetMein] Could not check first order status, defaulting to ?25', e);
+
   }
   renderCart(); // Re-render so cart immediately shows correct delivery fee
 }
@@ -2811,6 +2917,10 @@ function renderSmartCategories(shop){
         ['photo','Photo Cake'],
         ['tiered','Tiered']
       ]
+    : shop==='biryani'
+    ? [
+        ['veg-biryani','🍚 Veg Biryani']
+      ]
     : [
         ['all','All'],
         ['pizza','Pizza'],
@@ -2833,6 +2943,11 @@ function handleSmartCategory(shop,key){
     setCakeFilter(key);
     var cakeSection=document.getElementById('s-cakes');
     if(cakeSection) cakeSection.scrollIntoView({behavior:'smooth',block:'start'});
+    return;
+  }
+  if(shop==='biryani'){
+    var bg=document.getElementById('biryaniGrid');
+    if(bg) bg.scrollIntoView({behavior:'smooth',block:'start'});
     return;
   }
   fcat(null,key);
@@ -2982,12 +3097,14 @@ function refreshOrderBtn(sub){
     var note=document.getElementById('cnote');
     if(note){
       var hasCake=Object.keys(cart||{}).some(function(k){return cart[k]&&cart[k].isCake;});
-      var hasFf=Object.keys(cart||{}).some(function(k){return cart[k]&&!cart[k].isCake;});
-      var shopClosed=(hasFf&&!isOpen&&!DEV_ALWAYS_OPEN)||(hasCake&&!isCakeOpen&&!DEV_ALWAYS_OPEN);
+      var hasFf=Object.keys(cart||{}).some(function(k){return cart[k]&&cart[k].shop!=='biryani'&&!cart[k].isCake;});
+      var hasBiryani=Object.keys(cart||{}).some(function(k){return cart[k]&&cart[k].shop==='biryani';});
+      var shopClosed=(hasFf&&!isOpen&&!DEV_ALWAYS_OPEN)||(hasCake&&!isCakeOpen&&!DEV_ALWAYS_OPEN)||(hasBiryani&&!isBiryaniOpen&&!DEV_ALWAYS_OPEN);
       if(shopClosed){
         note.style.display='block';
         note.textContent= hasFf&&!isOpen
           ? (FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN?'Fry Day closed - opens 3:00 PM':'Fast food: 3:00 PM - 9:00 PM only')
+          : hasBiryani&&!isBiryaniOpen ? 'Biryani shop closed - opens 9:00 AM (till 2:00 PM)'
           : 'Bakery closed - opens 10:00 AM';
       } else { note.style.display='none'; }
     }
@@ -3000,23 +3117,29 @@ async function placeOrder(){
   const keys=Object.keys(cart);
   if(!keys.length){bmAlert('Cart Empty','Please add some items to your cart first.','info');return;}
 
-  // Detect if this is a cake order or fast food order
+  // Detect if this is a cake order, fast food order, or biryani order
   var hasCakeItems = keys.some(function(k){return cart[k].isCake;});
-  var hasFfItems = keys.some(function(k){return !cart[k].isCake;});
+  var hasBiryaniItems = keys.some(function(k){return cart[k].shop==='biryani';});
+  var hasFfItems = keys.some(function(k){return !cart[k].isCake && cart[k].shop!=='biryani';});
 
-  if(hasCakeItems && !hasFfItems){
+  if(hasBiryaniItems && !hasFfItems && !hasCakeItems){
+    // Pure biryani order
+    if(!isBiryaniOpen&&!DEV_ALWAYS_OPEN){
+      bmAlert('Biryani Shop is Closed','Shri Radhe Radhe opens at 9:00 AM and closes at 2:00 PM.','info');return;
+    }
+  } else if(hasCakeItems && !hasFfItems && !hasBiryaniItems){
     // Pure cake order - check cake shop open
     if(!isCakeOpen&&!DEV_ALWAYS_OPEN){
       bmAlert('Bakery is Closed','Closed - Opens at 10:00 AM','info');return;
     }
-  } else if(!hasCakeItems){
+  } else if(!hasCakeItems && !hasBiryaniItems){
     // Pure fast food order - check fast food open
     if(!isOpen&&!DEV_ALWAYS_OPEN){
       var closedMsg=FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN?'Closed - Opens at 3:00 PM':'Closed - Orders accepted 3:00 PM - 9:00 PM only.';
       bmAlert('Fry Day is Closed',closedMsg,'info');return;
     }
   } else {
-    // Mixed - check both
+    // Mixed - check all relevant
     if((!isOpen||FASTFOOD_FORCED_CLOSE)&&!DEV_ALWAYS_OPEN&&(!isCakeOpen)&&!DEV_ALWAYS_OPEN){
       bmAlert('Both Shops Closed','All shops are currently closed. Please check back during opening hours.','info');return;
     }
@@ -3121,15 +3244,15 @@ async function placeOrder(){
   if(_uid){
     // Use window.bmSetHasOrdered (module-level, has Firestore db access).
     if(typeof window.bmSetHasOrdered==='function'){
-      window.bmSetHasOrdered(_uid).catch(function(e){ console.warn('[BudgetMein] bmSetHasOrdered err',e); });
+      window.bmSetHasOrdered(_uid).catch(function(){});
     } else {
       // Fallback (should not normally reach here)
       try{
         var {setDoc: _sd2, doc: _d2, serverTimestamp: _st2} = await import('https://www.gstatic.com/firebasejs/10.11.0/firebase-firestore.js');
         await _sd2(_d2(db, 'users', _uid), { hasOrdered: true, updatedAt: _st2() }, { merge: true });
-        console.log('[BudgetMein] ? hasOrdered written to Firestore (fallback)');
+
       }catch(e){
-        console.warn('[BudgetMein] ? Could not write hasOrdered to Firestore', e);
+
       }
     }
     // Always update the in-memory flag so the current session is accurate immediately
@@ -3348,7 +3471,7 @@ function openProfile(view){
     }).catch(function(){});
   }
   }catch(e){
-    console.warn('openProfile err',e);
+
     document.getElementById('pOverlay').classList.add('on');
     document.getElementById('pSidebar').classList.add('on');
     document.body.style.overflow='hidden';
@@ -3513,7 +3636,7 @@ function renderProfileOrders(orders){
     // AUTO-EXPAND so users can actually see the orders without extra clicks
     document.getElementById('ordBody').classList.add('open');
     document.getElementById('ordArrow').classList.add('open');
-  }catch(e){console.warn('renderProfileOrders err',e);}
+  }catch(e){}
 }
 
 function toggleOrders(){
@@ -3552,7 +3675,7 @@ async function saveProfile(){
     // Claim phone in Firestore
     if(phoneDigits.length===10){
       if(typeof window.bmClaimCustomerPhone !== 'function'){
-        console.warn('[BudgetMein] bmClaimCustomerPhone not ready, skipping claim');
+
       } else {
         try{
           await window.bmClaimCustomerPhone(phoneDigits, {email:email,name:name});
@@ -3564,7 +3687,7 @@ async function saveProfile(){
             bmAlert('Phone Taken','This number is already linked to another account. Please use a different number.','warning');
             return;
           }
-          console.warn('[BudgetMein] Phone claim skipped:',msg);
+
         }
       }
     }
@@ -3599,7 +3722,7 @@ async function saveProfile(){
     var btn2=document.getElementById('profSaveBtn');
     if(ind2) ind2.classList.remove('show');
     if(btn2){btn2.disabled=false;btn2.textContent='Save Changes';}
-    console.error('[BudgetMein] saveProfile error:',e);
+
     bmAlert('Error','Could not save profile. Please try again. Error: '+((e&&e.message)||'unknown'),'error');
   }
 }
@@ -3732,7 +3855,7 @@ function syncCartAddressFromDefault(id){
     // ? FIX: Immediately update cart address display if cart is open
     var cartAddrDisp=document.getElementById('cartAddrDisplay');
     if(cartAddrDisp) cartAddrDisp.textContent=(found.address||addrObj.full||'')+(addrObj.hasGPS?' | GPS':'');
-  }catch(e){console.warn('[BM] syncCartAddress err',e);}
+  }catch(e){}
 }
 
 // ---- ADDRESS MODAL ----
@@ -3925,7 +4048,7 @@ const TSTEPS=[
   {emoji:'&#10004;',name:'Delivered!',min:42,msg:'Enjoy your meal.'}
 ];
 let _timerIv=null;
-let _forceDelivered=false; // set true when admin marks delivered via Firebase
+let _forceDelivered=false;
 
 function startOrderTimer(orderId){
   localStorage.setItem('bm_ts',Date.now());
@@ -3945,7 +4068,7 @@ function getTimeAt(offsetMin){
   return d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'});
 }
 
-// Poll Firebase every 15 sec to check if admin marked delivered
+
 let _pollIv=null;
 function startFirebasePoll(orderId){
   if(_pollIv)clearInterval(_pollIv);
@@ -4009,7 +4132,7 @@ function renderTracker(){
       cd.textContent=(prev?prev.name:'Processing')+'... "'+next.name+'" in ~'+rem+' min';
     } else {cd.style.display='none';}
     updateDeliveryBoyBtn(elapsed);
-  }catch(e){console.warn('tracker err',e);}
+  }catch(e){}
 }
 
 function updateDeliveryBoyBtn(elapsed){
@@ -4039,7 +4162,7 @@ function initTracker(){
         }
       }catch(e){}
     },10000); // update every 10 sec
-  }catch(e){console.warn('initTracker err',e);}
+  }catch(e){}
 }
 
 function triggerDelivered(){
@@ -4081,7 +4204,7 @@ function triggerDelivered(){
       }
     }
   }catch(e){
-    console.warn('triggerDelivered local update failed',e);
+
   }
 }
 function showConfetti(){
@@ -4274,7 +4397,7 @@ function toMs(st){
 }
 
 async function getOrderFromFirestore(orderId){
-  // Delegates to module-scoped helper so Firebase imports (query, collection, etc.) are in scope
+  
   return window.bmGetOrderFromFirestore(orderId);
 }
 
@@ -4319,7 +4442,7 @@ async function _openCancelModalAsync(orderId){
     document.getElementById('cancelModal').classList.add('on');
     document.body.style.overflow='hidden';
   }catch(e){
-    console.error('openCancelModal err',e);
+
     bmAlert('Error','Could not load order. Please try again.','error');
   }
 }
@@ -4363,10 +4486,10 @@ async function _confirmCancelOrderAsync(){
         var fo=JSON.parse(localStorage.getItem('bm_orders')||'[]');
         if(typeof renderProfileOrders==='function') renderProfileOrders(fo);
         else if(typeof showOrderHistory==='function') showOrderHistory();
-      }catch(re){console.warn('[BM] post-cancel UI err',re);}
+      }catch(re){}
     });
   }catch(e){
-    console.error('confirmCancelOrder err',e);
+
     if(btn){btn.disabled=false;btn.textContent='Cancel Order';}
     bmAlert('Error','Could not cancel order. Please try again or call: +91 96258 67683','warning');
   }
@@ -5226,6 +5349,7 @@ window.addEventListener('beforeunload',function(){
 function updateShopStatusBadges(){
   var ffB=document.getElementById('ffShopStatus');
   var ckB=document.getElementById('cakeShopStatus');
+  var brB=document.getElementById('biryaniShopStatus');
   function badge(el,open,closedLabel){
     if(!el)return;
     if(open){el.style.cssText='display:inline-block;padding:3px 10px;border-radius:50px;font-size:.66rem;font-weight:700;margin-bottom:7px;background:#F0FFF4;color:#16a34a;border:1px solid #B7F5C8';el.textContent='Open Now';}
@@ -5233,10 +5357,13 @@ function updateShopStatusBadges(){
   }
   badge(ffB, isOpen||DEV_ALWAYS_OPEN, 'Closed - Opens 3:00 PM');
   badge(ckB, isCakeOpen||DEV_ALWAYS_OPEN, 'Closed - Opens 10:00 AM');
+  badge(brB, isBiryaniOpen||DEV_ALWAYS_OPEN, 'Closed - Opens 9:00 AM');
   var ffCard=document.getElementById('ffCard');
   var ckCard=document.getElementById('cakeCard');
+  var brCard=document.getElementById('biryaniCard');
   if(ffCard)ffCard.style.opacity=(FASTFOOD_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)?'0.82':'1';
   if(ckCard)ckCard.style.opacity=(CAKE_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)?'0.82':'1';
+  if(brCard)brCard.style.opacity=(BIRYANI_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)?'0.82':'1';
 }
 function showShopPicker(){
   updateBottomNav('home');
@@ -5244,7 +5371,7 @@ function showShopPicker(){
   sessionStorage.removeItem('bm_active_shop'); // clear saved shop on back
   updateShopSwitcher(null);
   renderSmartCategories(null);
-  var els={shopPicker:'block',ffShopView:'none',cakeShopView:'none',msec:'none',nr:'none'};
+  var els={shopPicker:'block',ffShopView:'none',cakeShopView:'none',biryaniShopView:'none',msec:'none',nr:'none'};
   Object.keys(els).forEach(function(id){var el=document.getElementById(id);if(el)el.style.display=els[id];});
   // Hide search bar on shop picker landing page
   var mainNav=document.getElementById('mainNav');
@@ -5256,6 +5383,7 @@ function updateShopSwitcher(shop){
   var ssb=document.getElementById('shopSwitcherBar');
   var btnFf=document.getElementById('ssBtnFf');
   var btnCake=document.getElementById('ssBtnCake');
+  var btnBiryani=document.getElementById('ssBtnBiryani');
   if(ssb) ssb.style.display='flex';
   if(btnFf){
     btnFf.classList.toggle('active', shop==='fastfood');
@@ -5264,6 +5392,10 @@ function updateShopSwitcher(shop){
   if(btnCake){
     btnCake.classList.toggle('active', shop==='cake');
     btnCake.disabled=false;
+  }
+  if(btnBiryani){
+    btnBiryani.classList.toggle('active', shop==='biryani');
+    btnBiryani.disabled=false;
   }
 }
 function enterShop(shop){
@@ -5295,9 +5427,11 @@ function enterShop(shop){
   } else if(shop==='cake'){
     var ckv=document.getElementById('cakeShopView');
     var ffv=document.getElementById('ffShopView');
+    var brv=document.getElementById('biryaniShopView');
     var msec=document.getElementById('msec');
     if(ckv)ckv.style.display='block';
     if(ffv)ffv.style.display='none';
+    if(brv)brv.style.display='none';
     if(msec)msec.style.display='none';
     var cakeNotice=document.getElementById('cakeClosedNoticeBar');
     if(cakeNotice)cakeNotice.style.display=(CAKE_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)||(!isCakeOpen&&!DEV_ALWAYS_OPEN)?'flex':'none';
@@ -5313,6 +5447,25 @@ function enterShop(shop){
       if(typeof renderCakeGrid==='function')renderCakeGrid();
       var cakeGrid=document.getElementById('cakeGrid');
       if(cakeGrid) cakeGrid.scrollIntoView({behavior:'smooth',block:'start'});
+    },100);
+  } else if(shop==='biryani'){
+    var brv=document.getElementById('biryaniShopView');
+    var ffv=document.getElementById('ffShopView');
+    var ckv=document.getElementById('cakeShopView');
+    var msec=document.getElementById('msec');
+    if(brv)brv.style.display='block';
+    if(ffv)ffv.style.display='none';
+    if(ckv)ckv.style.display='none';
+    if(msec)msec.style.display='none';
+    var biryaniNotice=document.getElementById('biryaniClosedNotice');
+    if(biryaniNotice)biryaniNotice.style.display=(BIRYANI_FORCED_CLOSE&&!DEV_ALWAYS_OPEN)||(!isBiryaniOpen&&!DEV_ALWAYS_OPEN)?'flex':'none';
+    renderSmartCategories('biryani');
+    renderBiryaniGrid();
+    setTimeout(function(){
+      if(window._shopSwitchToken!==switchToken || activeShop!=='biryani') return;
+      renderBiryaniGrid();
+      var bg=document.getElementById('biryaniGrid');
+      if(bg) bg.scrollIntoView({behavior:'smooth',block:'start'});
     },100);
   }
   checkStore();
