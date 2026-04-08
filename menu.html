@@ -1066,11 +1066,11 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
 /* ---- ITEM MODAL ---- */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:1600;display:flex;align-items:center;justify-content:center;padding:16px;opacity:0;pointer-events:none;transition:opacity .28s;backdrop-filter:blur(4px)}
 .modal-overlay.on{opacity:1;pointer-events:all}
-.modal{background:var(--w);border-radius:18px;width:100%;max-width:440px;max-height:88vh;overflow-y:auto;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:mslide .28s ease-out both}
+.modal{background:var(--w);border-radius:18px;width:100%;max-width:440px;max-height:88vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 24px 64px rgba(0,0,0,.35);animation:mslide .28s ease-out both}
 @keyframes mslide{from{transform:translateY(24px);opacity:0}to{transform:translateY(0);opacity:1}}
-.modal-head{background:var(--n);color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;border-radius:18px 18px 0 0}
+.modal-head{background:var(--n);color:#fff;padding:18px 22px;display:flex;align-items:center;justify-content:space-between;border-radius:18px 18px 0 0;flex-shrink:0}
 .modal-head h3{font-family:var(--fl);font-size:1.1rem;font-weight:700}
-.modal-body{padding:20px}
+.modal-body{padding:20px;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;flex:1}
 .modal-section{margin-bottom:18px}
 .modal-section h4{font-family:var(--fl);font-size:.95rem;font-weight:700;color:var(--n);margin-bottom:10px;padding-bottom:6px;border-bottom:1px solid var(--bd)}
 .radio-row{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer;transition:var(--tr);border:1.5px solid transparent}
@@ -2017,26 +2017,26 @@ document.getElementById('srch').addEventListener('input',function(){
       </div>
       <div class="fb-q" style="margin-top:0">Overall Experience</div>
       <div class="stars" id="fbModalStars" style="justify-content:flex-start">
-        <span class="star" data-v="1">&#9733;</span>
-        <span class="star" data-v="2">&#9733;</span>
-        <span class="star" data-v="3">&#9733;</span>
-        <span class="star" data-v="4">&#9733;</span>
-        <span class="star" data-v="5">&#9733;</span>
+        <span class="star" data-v="1" onclick="bmSelectFbStar(this)">&#9733;</span>
+        <span class="star" data-v="2" onclick="bmSelectFbStar(this)">&#9733;</span>
+        <span class="star" data-v="3" onclick="bmSelectFbStar(this)">&#9733;</span>
+        <span class="star" data-v="4" onclick="bmSelectFbStar(this)">&#9733;</span>
+        <span class="star" data-v="5" onclick="bmSelectFbStar(this)">&#9733;</span>
       </div>
       <div class="fb-divider"></div>
       <div class="fb-q">🍽️ Food Quality</div>
       <div class="fb-opts" id="fbModalFood">
-        <button type="button" class="fb-opt" data-g="food" data-v="loved">😍 Loved it</button>
-        <button type="button" class="fb-opt" data-g="food" data-v="good">😊 Good</button>
-        <button type="button" class="fb-opt" data-g="food" data-v="okay">😐 Okay</button>
-        <button type="button" class="fb-opt" data-g="food" data-v="poor">😞 Poor</button>
+        <button type="button" class="fb-opt" data-g="food" data-v="loved" onclick="bmSelectFbOpt(this)">😍 Loved it</button>
+        <button type="button" class="fb-opt" data-g="food" data-v="good" onclick="bmSelectFbOpt(this)">😊 Good</button>
+        <button type="button" class="fb-opt" data-g="food" data-v="okay" onclick="bmSelectFbOpt(this)">😐 Okay</button>
+        <button type="button" class="fb-opt" data-g="food" data-v="poor" onclick="bmSelectFbOpt(this)">😞 Poor</button>
       </div>
       <div class="fb-q">🚴 Delivery Speed</div>
       <div class="fb-opts" id="fbModalSpeed">
-        <button type="button" class="fb-opt" data-g="speed" data-v="superfast">⚡ Super Fast</button>
-        <button type="button" class="fb-opt" data-g="speed" data-v="ontime">✅ On Time</button>
-        <button type="button" class="fb-opt" data-g="speed" data-v="late">🕐 Little Late</button>
-        <button type="button" class="fb-opt" data-g="speed" data-v="verylate">⏳ Very Late</button>
+        <button type="button" class="fb-opt" data-g="speed" data-v="superfast" onclick="bmSelectFbOpt(this)">⚡ Super Fast</button>
+        <button type="button" class="fb-opt" data-g="speed" data-v="ontime" onclick="bmSelectFbOpt(this)">✅ On Time</button>
+        <button type="button" class="fb-opt" data-g="speed" data-v="late" onclick="bmSelectFbOpt(this)">🕐 Little Late</button>
+        <button type="button" class="fb-opt" data-g="speed" data-v="verylate" onclick="bmSelectFbOpt(this)">⏳ Very Late</button>
       </div>
       <div class="fb-q">💬 Comments <span style="font-weight:400;color:var(--mu);font-size:.75rem">(optional)</span></div>
       <textarea class="fb-textarea" id="fbModalComment" placeholder="Tell us how we can do better..."></textarea>
@@ -4725,6 +4725,29 @@ function closeFeedbackModal(){
   document.body.style.overflow='';
   _fbOrderId=null;
 }
+// ================================================================
+// FEEDBACK MODAL - GLOBAL HELPERS (inline onclick fallback)
+// These are global so onclick="bmSelectFbOpt(this)" works reliably
+// on ALL mobile browsers including Android WebView & iOS Safari
+// ================================================================
+window.bmSelectFbOpt = function(btn){
+  if(!btn) return;
+  var grp = btn.dataset.g;
+  document.querySelectorAll('#fbModal .fb-opt[data-g="'+grp+'"]').forEach(function(b){
+    b.classList.remove('sel');
+  });
+  btn.classList.add('sel');
+};
+window.bmSelectFbStar = function(el){
+  if(!el) return;
+  var v = parseInt(el.dataset.v||'0');
+  _fbStars = v;
+  document.querySelectorAll('#fbModal .star').forEach(function(s){
+    var sv = parseInt(s.dataset.v||'0');
+    s.classList.toggle('sel', sv <= v);
+    s.classList.remove('hov');
+  });
+};
 function initFeedbackModal(){
   var fbModalEl = document.getElementById('fbModal');
   if(!fbModalEl) return;
