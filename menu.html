@@ -4726,16 +4726,28 @@ function submitOrderFeedback(){
     if(!_fbOrderId){bmAlert('Error','Missing order ID.','error');return;}
     if(!_fbStars){bmAlert('Select Rating','Please tap a star to rate your experience.','warning');return;}
 
-    // Feedback should be available only after delivery (realistic flow)
+    // Feedback: allow after Delivered status, OR 20+ min since order, OR if startTime missing
     var orders=JSON.parse(localStorage.getItem('bm_orders')||'[]');
     var ord=orders.find(function(o){
       var oid=(o&&((o.id||o.orderId)||''))||'';
       return oid===_fbOrderId;
     });
-    var elapsedMin=ord && ord.startTime ? ((Date.now()-ord.startTime)/60000) : null;
-    var isDelivered = (ord && ord.status==='Delivered') || (elapsedMin!==null && elapsedMin>=40);
+    // Safely parse startTime — handles plain ms, Firestore {seconds}, or {toMillis()} object
+    var stMs=null;
+    if(ord && ord.startTime){
+      var st=ord.startTime;
+      if(typeof st==='number') stMs=st;
+      else if(typeof st==='object' && typeof st.toMillis==='function') stMs=st.toMillis();
+      else if(typeof st==='object' && st.seconds) stMs=st.seconds*1000;
+      else if(typeof st==='string') stMs=parseInt(st)||null;
+    }
+    var elapsedMin = stMs ? ((Date.now()-stMs)/60000) : null;
+    var isDelivered = (ord && (ord.status==='Delivered'||ord.status==='delivered'))
+                    || (elapsedMin!==null && elapsedMin>=20)
+                    || (!stMs);
     if(!isDelivered){
-      bmAlert('Not Yet!','Feedback is available after your order is delivered.','info');
+      var remMin=Math.ceil(20-(elapsedMin||0));
+      bmAlert('Not Yet!','Feedback will be available in ~'+remMin+' min after your order is delivered.','info');
       return;
     }
 
