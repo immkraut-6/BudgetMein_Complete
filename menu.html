@@ -1002,8 +1002,8 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
 @keyframes fall{0%{transform:translateY(-20px) rotate(0deg);opacity:1}100%{transform:translateY(110vh) rotate(720deg);opacity:0}}
 /* ---- STAR RATING ---- */
 .stars{display:flex;gap:6px;justify-content:center;margin:8px 0 4px}
-.star{font-size:1.8rem;cursor:pointer;color:#D0D0D0;transition:color .15s,transform .15s;line-height:1}
-.star:hover,.star.hov,.star.sel{color:var(--g);transform:scale(1.15)}
+.star{font-size:1.8rem;cursor:pointer;color:#D0D0D0;transition:color .15s,transform .15s;line-height:1;user-select:none;-webkit-user-select:none;touch-action:manipulation;display:inline-block;padding:4px}
+.star:hover,.star.hov,.star.sel{color:var(--g);transform:scale(1.18)}
 /* ---- FEEDBACK CARD ---- */
 .feedback-card{background:var(--w);border-radius:14px;padding:20px;width:100%;max-width:420px;box-shadow:0 4px 20px rgba(0,0,0,.08);margin-bottom:18px;animation:slideup .4s ease-out;display:none}
 .feedback-card.on{display:block}
@@ -1012,7 +1012,7 @@ footer{background:var(--n);color:#fff;padding:36px 5% 20px}
 .fb-sub{font-size:.8rem;color:var(--mu);margin-bottom:14px;text-align:center}
 .fb-q{font-size:.83rem;font-weight:600;color:var(--tx);margin:12px 0 6px}
 .fb-opts{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:4px}
-.fb-opt{padding:6px 12px;border-radius:20px;border:1.5px solid var(--bd);font-size:.78rem;font-weight:600;cursor:pointer;color:var(--mu);background:var(--w);transition:var(--tr)}
+.fb-opt{padding:8px 14px;border-radius:20px;border:1.5px solid var(--bd);font-size:.78rem;font-weight:600;cursor:pointer;color:var(--mu);background:var(--w);transition:var(--tr);touch-action:manipulation;user-select:none;-webkit-user-select:none}
 .fb-opt.sel{border-color:var(--p);color:var(--p);background:#FFF6F3}
 .fb-textarea{width:100%;border:1.5px solid var(--bd);border-radius:10px;padding:10px 12px;font-family:var(--fb);font-size:.82rem;outline:none;resize:vertical;min-height:70px;margin-top:4px}
 .fb-textarea:focus{border-color:var(--p)}
@@ -4692,33 +4692,49 @@ function closeFeedbackModal(){
   _fbOrderId=null;
 }
 function initFeedbackModal(){
-  // Stars
-  document.querySelectorAll('#fbModal .star').forEach(function(star){
+  // ── STARS: works on both mobile (touch) and desktop (mouse) ──
+  var starEls=[].slice.call(document.querySelectorAll('#fbModal .star'));
+  function paintStars(n){
+    starEls.forEach(function(s){
+      var sv=parseInt(s.dataset.v||'0');
+      s.classList.toggle('sel',sv<=n);
+      s.classList.remove('hov');
+    });
+  }
+  starEls.forEach(function(star){
     var v=parseInt(star.dataset.v||'0');
-    star.addEventListener('click',function(){
+    // touch (mobile)
+    star.addEventListener('touchend',function(e){
+      e.preventDefault(); // prevent ghost click
       _fbStars=v;
-      document.querySelectorAll('#fbModal .star').forEach(function(s){
-        var sv=parseInt(s.dataset.v||'0');
-        s.classList.toggle('sel',sv<=_fbStars);
-      });
+      paintStars(_fbStars);
+    },{passive:false});
+    // click (desktop)
+    star.addEventListener('click',function(e){
+      e.stopPropagation();
+      _fbStars=v;
+      paintStars(_fbStars);
     });
     star.addEventListener('mouseenter',function(){
-      document.querySelectorAll('#fbModal .star').forEach(function(s){
-        var sv=parseInt(s.dataset.v||'0');
-        s.classList.toggle('hov',sv<=v);
+      starEls.forEach(function(s){
+        s.classList.toggle('hov',parseInt(s.dataset.v||'0')<=v);
       });
     });
     star.addEventListener('mouseleave',function(){
-      document.querySelectorAll('#fbModal .star').forEach(function(s){s.classList.remove('hov');});
+      starEls.forEach(function(s){s.classList.remove('hov');});
     });
   });
-  // Options
-  document.querySelectorAll('#fbModal .fb-opt').forEach(function(btn){
-    btn.addEventListener('click',function(){
-      var grp=this.dataset.g;
-      document.querySelectorAll('#fbModal .fb-opt[data-g="'+grp+'"]').forEach(function(b){b.classList.remove('sel');});
-      this.classList.add('sel');
-    });
+  // ── OPTIONS: food & speed buttons ──
+  var optEls=[].slice.call(document.querySelectorAll('#fbModal .fb-opt'));
+  optEls.forEach(function(btn){
+    function selectOpt(e){
+      if(e) e.stopPropagation();
+      var grp=btn.dataset.g;
+      optEls.forEach(function(b){if(b.dataset.g===grp) b.classList.remove('sel');});
+      btn.classList.add('sel');
+    }
+    btn.addEventListener('touchend',function(e){e.preventDefault();selectOpt(e);},{passive:false});
+    btn.addEventListener('click',selectOpt);
   });
 }
 function submitOrderFeedback(){
@@ -4726,28 +4742,28 @@ function submitOrderFeedback(){
     if(!_fbOrderId){bmAlert('Error','Missing order ID.','error');return;}
     if(!_fbStars){bmAlert('Select Rating','Please tap a star to rate your experience.','warning');return;}
 
-    // Feedback: allow after Delivered status, OR 20+ min since order, OR if startTime missing
+    // ── Delivery check: allow feedback once order is delivered or 20+ min old ──
     var orders=JSON.parse(localStorage.getItem('bm_orders')||'[]');
     var ord=orders.find(function(o){
       var oid=(o&&((o.id||o.orderId)||''))||'';
       return oid===_fbOrderId;
     });
-    // Safely parse startTime — handles plain ms, Firestore {seconds}, or {toMillis()} object
+    // Safely convert startTime (plain ms, Firestore {seconds}, or {toMillis()})
     var stMs=null;
     if(ord && ord.startTime){
-      var st=ord.startTime;
-      if(typeof st==='number') stMs=st;
-      else if(typeof st==='object' && typeof st.toMillis==='function') stMs=st.toMillis();
-      else if(typeof st==='object' && st.seconds) stMs=st.seconds*1000;
-      else if(typeof st==='string') stMs=parseInt(st)||null;
+      var _st=ord.startTime;
+      if(typeof _st==='number') stMs=_st;
+      else if(_st && typeof _st.toMillis==='function') stMs=_st.toMillis();
+      else if(_st && _st.seconds) stMs=_st.seconds*1000;
+      else if(typeof _st==='string') stMs=parseInt(_st)||null;
     }
     var elapsedMin = stMs ? ((Date.now()-stMs)/60000) : null;
     var isDelivered = (ord && (ord.status==='Delivered'||ord.status==='delivered'))
                     || (elapsedMin!==null && elapsedMin>=20)
-                    || (!stMs);
+                    || (elapsedMin===null); // no startTime = don't block
     if(!isDelivered){
-      var remMin=Math.ceil(20-(elapsedMin||0));
-      bmAlert('Not Yet!','Feedback will be available in ~'+remMin+' min after your order is delivered.','info');
+      var _rem=Math.ceil(20-(elapsedMin||0));
+      bmAlert('Almost There!','Your order is on the way. Feedback will unlock in ~'+_rem+' min.','info');
       return;
     }
 
