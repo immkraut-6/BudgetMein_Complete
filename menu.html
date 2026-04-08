@@ -547,24 +547,40 @@ window.bmOrderTG=async function(order,items,sub,del,plat){
 };
 window.bmFeedbackTG=async function(data){
   const u=JSON.parse(localStorage.getItem("bm_user")||"{}");
-  const stars=(data.stars||0)+"/5";
-  const itemsText=data.itemsText||"";
-  const totalText=(typeof data.total!=="undefined"&&data.total!==null)?bmMoney(data.total):"";
-  const addrText=data.address?("\nAddress: "+data.address):"";
-  await tg("feedback",
-    "<b>NEW FEEDBACK</b>\n--------------\n"+
-    "<b>Name:</b> "+(u.name||"Guest")+"\n"+
-    (u.phone?("<b>Phone:</b> "+u.phone+"\n"):"")+
-    "<b>Order:</b> #"+data.orderId+"\n"+
-    (itemsText?("<b>Items:</b>\n"+itemsText+"\n"):"")+
-    "Rating: "+stars+"\n"+
-    "Food: "+data.foodRating+"\n"+
-    "Delivery: "+data.speedRating+
-    (data.comment?"\nComment: "+data.comment:"")+
-    (totalText?("\n<b>Total:</b> "+totalText):"")+
-    addrText+
-    "\n"+new Date().toLocaleString("en-IN")
-  );
+
+  // Visual star string e.g. ★★★★☆
+  var starCount=parseInt(data.stars||0);
+  var starStr='';
+  for(var si=1;si<=5;si++) starStr+=(si<=starCount?'\u2605':'\u2606');
+
+  // Food rating label with emoji
+  var foodMap={loved:'\ud83d\ude0d Loved it',good:'\ud83d\ude0a Good',okay:'\ud83d\ude10 Okay',poor:'\ud83d\ude1e Poor','':'\u2014 Not rated'};
+  var speedMap={superfast:'\u26a1 Super Fast',ontime:'\u2705 On Time',late:'\ud83d\udd50 Little Late',verylate:'\u23f3 Very Late','':'\u2014 Not rated'};
+  var foodLabel=foodMap[data.foodRating||'']||data.foodRating||'\u2014';
+  var speedLabel=speedMap[data.speedRating||'']||data.speedRating||'\u2014';
+
+  const totalText=(typeof data.total!=="undefined"&&data.total!==null)?('\u20b9'+data.total):'';
+  const itemsText=data.itemsText||'';
+  const time=new Date().toLocaleString('en-IN',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+
+  var msg=
+    '\ud83d\udcdd <b>NEW FEEDBACK</b>\n'+
+    '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'+
+    '\ud83d\udc64 <b>Name:</b> '+(u.name||'Guest')+'\n'+
+    (u.phone?('\ud83d\udcde <b>Phone:</b> '+u.phone+'\n'):'')+
+    '\ud83d\udce6 <b>Order:</b> #'+data.orderId+'\n'+
+    (totalText?('\ud83d\udcb0 <b>Total:</b> '+totalText+'\n'):'')+
+    (data.address?('\ud83d\udccd <b>Address:</b> '+data.address+'\n'):'')+
+    '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'+
+    (itemsText?('\ud83d\uded2 <b>Items:</b>\n'+itemsText+'\n\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'):'')+
+    '\u2b50 <b>Rating:</b> '+starStr+' ('+starCount+'/5)\n'+
+    '\ud83c\udf7d\ufe0f <b>Food Quality:</b> '+foodLabel+'\n'+
+    '\ud83d\udeef\ufe0f <b>Delivery Speed:</b> '+speedLabel+'\n'+
+    (data.comment?('\ud83d\udcac <b>Comment:</b> <i>'+data.comment+'</i>\n'):'')+
+    '\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n'+
+    '\ud83d\udd52 '+time;
+
+  await tg("feedback", msg);
 };
 window.bmNewCustomerTG=async function(user){
   await tg('customer','<b>NEW CUSTOMER</b>\n--------------\n<b>Name:</b> '+user.name+'\n<b>Phone:</b> '+user.phone+'\n<b>Email:</b> '+(user.email||'N/A')+'\n<b>Address:</b> '+(user.address||'N/A')+'\n'+new Date().toLocaleString('en-IN'));
@@ -4869,10 +4885,16 @@ function submitOrderFeedback(){
       try{
         if(ord && ord.itemsFull && ord.itemsFull.length){
           itemsText=ord.itemsFull.map(function(i){
-            return "ï¿½ "+(i.e||"")+" "+(i.n||"")+(i.meta?" ("+i.meta+")":"")+" x"+(i.qty||1)+"   <b>?"+((i.p||0)*(i.qty||1))+"</b>";
-          }).join("\n");
-        } else if(ord && ord.items){
-          itemsText=String(ord.items);
+            var name=(i.n||i.name||'Item');
+            var meta=i.meta?(' ('+i.meta+')'):'';
+            var qty=i.qty||i.quantity||1;
+            var price=(i.p||i.price||0)*qty;
+            return '\u2023 '+name+meta+' x'+qty+'  \u2014  <b>\u20b9'+price+'</b>';
+          }).join('\n');
+        } else if(ord && ord.items && Array.isArray(ord.items)){
+          itemsText=ord.items.map(function(i){
+            return '\u2023 '+(i.name||i.n||'Item')+' x'+(i.quantity||i.qty||1)+'  \u2014  <b>\u20b9'+((i.price||i.p||0)*(i.quantity||i.qty||1))+'</b>';
+          }).join('\n');
         }
       }catch(e){}
 
