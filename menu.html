@@ -915,7 +915,7 @@ body.page-leaving{opacity:0;transition:opacity .2s ease}
 .sbhead-sub{font-size:.68rem;color:rgba(255,255,255,.5);margin-top:1px}
 .sclose{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.7);font-size:1rem;cursor:pointer;border-radius:8px;width:32px;height:32px;display:flex;align-items:center;justify-content:center;transition:var(--tr)}
 .sclose:hover{background:rgba(255,69,0,.3);color:#fff;border-color:transparent}
-.sbbody{padding:16px 16px 0}
+.sbbody{flex:1;overflow-y:auto;padding:16px 16px 0}
 
 /* ===== EMPTY CART ===== */
 .cempty{text-align:center;padding:60px 20px 40px;color:var(--mu)}
@@ -961,7 +961,12 @@ body.page-leaving{opacity:0;transition:opacity .2s ease}
 .ci-del:hover{background:#FFF3F3;color:var(--er)}
 
 /* ===== CART FOOTER ===== */
-.sbfoot{padding:14px 16px 16px;background:#F7F8FC;border-top:1px solid rgba(26,26,46,.06);margin-top:auto}
+.sbfoot{padding:14px 16px 16px;background:#F7F8FC;flex-shrink:0;border-top:1px solid rgba(26,26,46,.06)}
+/* Cart scroll fix: cart body+footer scroll as one unit so order button is never hidden */
+#cSidebar .sbbody{flex:0 0 auto;overflow-y:visible}
+#cSidebar{overflow:hidden}
+#cSidebar .cart-scroll-wrap{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column}
+#cSidebar .cart-scroll-wrap #cfoot{flex-shrink:0;border-top:1px solid rgba(26,26,46,.06)}
 
 /* First order free delivery badge */
 .free-del-badge{background:linear-gradient(135deg,#F0FFF4,#DCFCE7);border:1.5px solid #86EFAC;border-radius:10px;padding:8px 12px;margin-bottom:10px;display:none;font-size:.75rem;color:#166534;font-weight:700;text-align:center}
@@ -2322,9 +2327,6 @@ document.getElementById('srch').addEventListener('input',function(){
     <button class="sclose" onclick="closeCart()">&#10005;</button>
   </div>
 
-  <!-- SCROLLABLE CONTENT AREA -->
-  <div id="cartScrollArea" style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;display:flex;flex-direction:column;">
-
   <!-- DELIVERY PROGRESS BAR -->
   <div class="fpbar" id="fpbar" style="display:none;padding:10px 14px 0">
     <div class="fpbar-inner">
@@ -2333,7 +2335,8 @@ document.getElementById('srch').addEventListener('input',function(){
     </div>
   </div>
 
-  <!-- CART ITEMS -->
+  <!-- CART ITEMS + FOOTER: wrapped in single scrollable container -->
+  <div class="cart-scroll-wrap">
   <div class="sbbody" id="cbody"></div>
 
   <!-- FOOTER -->
@@ -2393,8 +2396,7 @@ document.getElementById('srch').addEventListener('input',function(){
     <p class="closednote" id="cnote" style="display:none">Orders accepted 3:00 PM - 9:00 PM only</p>
     <p class="closednote" id="checkoutNote" style="display:none;color:var(--er)"></p>
   </div>
-
-  </div><!-- /cartScrollArea -->
+  </div><!-- /cart-scroll-wrap -->
 </aside>
 <script>
 // ============================================================
@@ -2423,11 +2425,59 @@ const OPEN_UNTIL_MINUTES = FASTFOOD_OPEN_UNTIL;
 // PRODUCTION FLAGS — frozen so they cannot be changed from browser DevTools
 const DEV_ALWAYS_OPEN = false;
 const DEV_SHOW_DEBUG  = false;
-// Lock these so nobody can type DEV_ALWAYS_OPEN=true in browser console to bypass shop-closed
+// ─────────────────────────────────────────────────────────────────────────────
+// SECURITY LOCK — freezes all shop flags so NO ONE can open shops via DevTools
+// Only the owner can temporarily open shops using the secret owner panel
+// ─────────────────────────────────────────────────────────────────────────────
 try{
-  Object.defineProperty(window,'DEV_ALWAYS_OPEN',{value:false,writable:false,configurable:false});
+  // Lock dev flags — these are the ones used everywhere in the code
+  Object.defineProperty(window,'DEV_ALWAYS_OPEN',{get:function(){return _ownerTestMode||false;},configurable:false});
   Object.defineProperty(window,'DEV_SHOW_DEBUG', {value:false,writable:false,configurable:false});
+  // Lock all timing constants so no one can change them in DevTools
+  ['FASTFOOD_OPEN_FROM','FASTFOOD_OPEN_UNTIL','FASTFOOD_FORCED_CLOSE',
+   'CAKE_OPEN_FROM','CAKE_OPEN_UNTIL','CAKE_FORCED_CLOSE',
+   'BIRYANI_OPEN_FROM','BIRYANI_OPEN_UNTIL','BIRYANI_FORCED_CLOSE',
+   'OPEN_FROM_MINUTES','OPEN_UNTIL_MINUTES'
+  ].forEach(function(k){
+    var v=window[k];
+    try{Object.defineProperty(window,k,{value:v,writable:false,configurable:false});}catch(e){}
+  });
 }catch(e){}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OWNER TESTING MODE — password-protected, session-only, invisible to users
+// Hash of the owner password (SHA-256 of "BudgetMein@Owner2026")
+// To change password: update _OWNER_HASH below with new SHA-256 hash
+// ─────────────────────────────────────────────────────────────────────────────
+var _ownerTestMode = (sessionStorage.getItem('_bm_owner') === '1');
+const _OWNER_HASH = '49f70d08fa6d9adba3d59dd9b0838756a8162f390b190bebf253bac7fdd512b6'; // SHA-256 of owner password
+async function _ownerHash(str){
+  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(str));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+// Owner opens the test panel by typing: ownerTest() in console
+window.ownerTest = async function(){
+  var pw = prompt('🔐 BudgetMein Owner Access\nEnter your owner password to open all shops for testing:');
+  if(!pw){return;}
+  var h = await _ownerHash(pw);
+  if(h === _OWNER_HASH){
+    _ownerTestMode = true;
+    sessionStorage.setItem('_bm_owner','1');
+    checkStore(); renderMenu && renderMenu(); renderCart && renderCart();
+    alert('✅ Owner mode ON — All shops open for testing!\nThis session only. Close tab to exit owner mode.');
+  } else {
+    alert('❌ Wrong password. Access denied.');
+    console.warn('BudgetMein: Invalid owner password attempt.');
+  }
+};
+window.ownerExit = function(){
+  _ownerTestMode = false;
+  sessionStorage.removeItem('_bm_owner');
+  checkStore(); renderMenu && renderMenu(); renderCart && renderCart();
+  alert('Owner mode OFF — shops back to normal timing.');
+};
+// Show owner status hint on load if already in owner mode
+if(_ownerTestMode){ console.info('%c🟢 BudgetMein Owner Mode Active — type ownerExit() to disable','color:#28a745;font-weight:bold'); }
 
 // CONTACT
 const SUPPORT_PHONE      = "+919625867683";
@@ -2624,21 +2674,21 @@ function checkStore(){
     b.className='';
     if(activeShop==='fastfood'){
       if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
-      else if(FASTFOOD_FORCED_CLOSE){b.className='bc';b.textContent='Fry Day is closed - try our bakery shop';}
+      else if(FASTFOOD_FORCED_CLOSE){b.className='bc';b.textContent='Fry Day is closed today - opens at 3:00 PM to 9:00 PM';}
       else if(isOpen){b.className='bo';b.textContent='Fry Day is open - closes at 9:00 PM';}
-      else if(m<FASTFOOD_OPEN_FROM){b.className='bs';b.textContent='Fry Day Opens at 3:00 PM';}
+      else if(m<FASTFOOD_OPEN_FROM){b.className='bs';b.textContent='Fry Day Opens at 3:00 PM (till 9:00 PM)';}
       else{b.className='bc';b.textContent='Fry Day is closed - opens tomorrow at 3:00 PM';}
     } else if(activeShop==='cake'){
       if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
-      else if(CAKE_FORCED_CLOSE){b.className='bc';b.textContent='Shri Ram Ji Bakery is Closed';}
+      else if(CAKE_FORCED_CLOSE){b.className='bc';b.textContent='Shri Ram Ji Bakery is closed today - opens 10:00 AM to 9:00 PM';}
       else if(isCakeOpen){b.className='bo';b.textContent='Shri Ram Ji Bakery is open - closes at 9:00 PM';}
-      else if(m<CAKE_OPEN_FROM){b.className='bs';b.textContent='Bakery Opens at 10:00 AM';}
+      else if(m<CAKE_OPEN_FROM){b.className='bs';b.textContent='Bakery Opens at 10:00 AM (till 9:00 PM)';}
       else{b.className='bc';b.textContent='Bakery closed - opens tomorrow at 10:00 AM';}
     } else if(activeShop==='biryani'){
       if(DEV_ALWAYS_OPEN){b.className='bo';b.textContent='🟢 Open';}
-      else if(BIRYANI_FORCED_CLOSE){b.className='bc';b.textContent='Shri Radhe Radhe is Closed';}
+      else if(BIRYANI_FORCED_CLOSE){b.className='bc';b.textContent='Shri Radhe Radhe is closed today - opens 9:00 AM to 2:00 PM';}
       else if(isBiryaniOpen){b.className='bo';b.textContent='Shri Radhe Radhe is open - closes at 2:00 PM';}
-      else if(m<BIRYANI_OPEN_FROM){b.className='bs';b.textContent='Biryani Shop Opens at 9:00 AM';}
+      else if(m<BIRYANI_OPEN_FROM){b.className='bs';b.textContent='Biryani Shop Opens at 9:00 AM (till 2:00 PM)';}
       else{b.className='bc';b.textContent='Biryani Shop closed - opens tomorrow at 9:00 AM';}
     } else {
       const anyOpen=isOpen||isCakeOpen||isBiryaniOpen;
@@ -5275,6 +5325,17 @@ function closeTermsModal(){document.getElementById('termsModal').classList.remov
 })();
 
 // ---- INIT ----
+// updateShopSwitcher is defined later but needed at init — define early here
+function updateShopSwitcher(shop){
+  var ssb=document.getElementById('shopSwitcherBar');
+  var btnFf=document.getElementById('ssBtnFf');
+  var btnCake=document.getElementById('ssBtnCake');
+  var btnBiryani=document.getElementById('ssBtnBiryani');
+  if(ssb) ssb.style.display='flex';
+  if(btnFf){ btnFf.classList.toggle('active', shop==='fastfood'); btnFf.disabled=false; }
+  if(btnCake){ btnCake.classList.toggle('active', shop==='cake'); btnCake.disabled=false; }
+  if(btnBiryani){ btnBiryani.classList.toggle('active', shop==='biryani'); btnBiryani.disabled=false; }
+}
 renderMenu();renderCart();
 updateBottomNav('home');
 updateShopSwitcher(null);
@@ -5408,12 +5469,12 @@ window.addEventListener('beforeunload',function(){
       <p style="margin-bottom:14px">This app is <b>not intended for children under 13 years of age</b>. We do not knowingly collect data from children under 13. If you believe a child under 13 has provided data, contact us immediately.</p>
 
       <h4 style="font-family:var(--fl);color:var(--p);margin-bottom:6px">8. Your Rights &amp; Data Deletion</h4>
-      <p style="margin-bottom:14px">You may request access, correction, or deletion of your data at any time. To delete your account and all data, contact us at <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2547504142405148404c4b4d4049554140564e654248444c490b464a48">[email&#160;protected]</a></b> or WhatsApp +91 96258 67683. We process requests within 30 days.</p>
+      <p style="margin-bottom:14px">You may request access, correction, or deletion of your data at any time. To delete your account and all data, contact us at <b><a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="4f2d3a2b282a3b222a2621272a233f2b2a3c240f28222e2623612c2022">[email&#160;protected]</a></b> or WhatsApp +91 96258 67683. We process requests within 30 days.</p>
 
       <h4 style="font-family:var(--fl);color:var(--p);margin-bottom:6px">9. Contact</h4>
       <p style="margin-bottom:4px">&#128205; Jahangir Puri, Delhi - 110033</p>
       <p style="margin-bottom:4px">&#9742; +91 96258 67683</p>
-      <p style="margin-bottom:8px">&#9993; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c3a1b6a7a4a6b7aea6aaadaba6afb3a7a6b0a883a4aea2aaafeda0acae">[email&#160;protected]</a></p>
+      <p style="margin-bottom:8px">&#9993; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="a4c6d1c0c3c1d0c9c1cdcaccc1c8d4c0c1d7cfe4c3c9c5cdc88ac7cbc9">[email&#160;protected]</a></p>
       <p style="margin-bottom:16px"><a href="/privacy.html" target="_blank" style="color:var(--p)">View Full Privacy Policy &#8599;</a></p>
 
       <button class="confirm-btn" onclick="closePrivacyModal()">I Understand</button>
@@ -5511,7 +5572,7 @@ window.addEventListener('beforeunload',function(){
       <h4 style="font-family:var(--fl);color:var(--p);margin-bottom:6px">12. Contact &amp; Support</h4>
       <p style="margin-bottom:4px">&#128205; Jahangir Puri, Delhi - 110033</p>
       <p style="margin-bottom:4px">&#9742; +91 96258 67683 (Call / WhatsApp)</p>
-      <p style="margin-bottom:4px">&#9993; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="472532232022332a222e292f222b372322342c07202a262e2b6924282a">[email&#160;protected]</a></p>
+      <p style="margin-bottom:4px">&#9993; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="2a485f4e4d4f5e474f4344424f465a4e4f59416a4d474b434604494547">[email&#160;protected]</a></p>
       <p style="margin-bottom:16px">Available: Monday to Sunday, 3:00 PM - 9:00 PM</p>
 
       <h4 style="font-family:var(--fl);color:var(--p);margin-bottom:6px">13. Governing Law</h4>
