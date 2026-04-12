@@ -531,8 +531,7 @@ window.bmSaveOrder=async function(orderData){
       date:          orderData.date||'',
       time:          orderData.time||'',
       isFirstOrder:  !!orderData.isFirstOrder,
-      email:         orderData.email||'',
-      shopName:      orderData.shopName||''
+      email:         orderData.email||''
     };
     const ref=await addDoc(collection(db,'orders'),firestoreData);
     window._activeOrderDocId=ref.id;
@@ -2396,7 +2395,7 @@ document.getElementById('srch').addEventListener('input',function(){
     <!-- BILL -->
     <div class="bill-box">
       <div class="bill-kitchen">
-        <span>Served by <b style="color:var(--p)" id="cartShopLabel">BudgetMein</b></span>
+        <span>Served by <b style="color:var(--p)">Fry Day</b></span>
         <span>Jahangir Puri - PIN 110033</span>
       </div>
       <div class="crow"><span>Item Total</span><span id="sub">&#8377;0</span></div>
@@ -3274,17 +3273,6 @@ function renderCart(){
   var addr=getCartAddress();
   var addrDisplay=document.getElementById('cartAddrDisplay');
   if(addrDisplay)addrDisplay.textContent=addr||'Tap Change to add delivery address';
-  // Update "Served by" store label dynamically
-  var cartShopLabelEl=document.getElementById('cartShopLabel');
-  if(cartShopLabelEl){
-    var hasBiryaniInCart=Object.keys(cart).some(function(k){return cart[k]&&cart[k].shop==='biryani';});
-    var hasCakeInCart=Object.keys(cart).some(function(k){return cart[k]&&cart[k].isCake;});
-    var hasFfInCart=Object.keys(cart).some(function(k){return cart[k]&&!cart[k].isCake&&cart[k].shop!=='biryani';});
-    if(hasBiryaniInCart&&!hasCakeInCart&&!hasFfInCart) cartShopLabelEl.textContent='Shri Radhe Radhe';
-    else if(hasCakeInCart&&!hasFfInCart&&!hasBiryaniInCart) cartShopLabelEl.textContent='Shri Ram Ji Bakery';
-    else if(hasFfInCart&&!hasCakeInCart&&!hasBiryaniInCart) cartShopLabelEl.textContent='Fry Day';
-    else cartShopLabelEl.textContent='BudgetMein';
-  }
   refreshOrderBtn(sub);
 }
 
@@ -3447,8 +3435,7 @@ async function placeOrder(){
     status:'pending',
     deliveryBoyId:null,
     userId:window._bmUserId||'',
-    startTime:nowMs,
-    shopName:hasBiryaniItems&&!hasFfItems&&!hasCakeItems?'Shri Radhe Radhe':hasCakeItems&&!hasFfItems&&!hasBiryaniItems?'Shri Ram Ji Bakery':hasFfItems&&!hasCakeItems&&!hasBiryaniItems?'Fry Day':'BudgetMein'
+    startTime:nowMs
   };
   orders.unshift(orderObj);
   if(orders.length>20)orders.pop();
@@ -3515,7 +3502,6 @@ async function placeOrder(){
     name:orderObj.name,
     phone:orderObj.phone,
     email:orderObj.email,
-    shopName:orderObj.shopName||'',
     address:deliveryAddress,
     lat:orderObj.lat||'',
     lng:orderObj.lng||'',
