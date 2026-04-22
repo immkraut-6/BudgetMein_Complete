@@ -1,5 +1,5 @@
 // BudgetMein Service Worker v1.0
-const CACHE_NAME = 'budgetmein-v2-customer-notify';
+const CACHE_NAME = 'budgetmein-v4-maintenance';
 const PRECACHE = ['/', '/index.html', '/menu.html', '/offline.html', '/manifest.json'];
 
 self.addEventListener('install', function(e) {
